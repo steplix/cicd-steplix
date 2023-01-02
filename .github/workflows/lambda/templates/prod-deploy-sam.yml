@@ -7,7 +7,7 @@ on:
 
 jobs:
   process-deploy:
-    uses: steplix/steplix-actions/lambda/deploy-sam.yml
+    uses: steplix/steplix-actions/.github/workflows/lambda/deploy-sam.yml@latest
     with:
       environment: production
     secrets:
