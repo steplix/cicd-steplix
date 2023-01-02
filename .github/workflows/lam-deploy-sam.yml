@@ -8,6 +8,7 @@ on:
         required: true
       pr-branch:
         type: string
+        description: Branch name to generate a new pull request when all workflow is success, the PR isn't generate if don't pass this arg.
         required: false
     secrets:
       variables:
