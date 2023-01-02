@@ -1,0 +1,17 @@
+name: Deploy to Testing
+
+on:
+  push:
+    branches:
+      - testing
+
+jobs:
+  process-deploy:
+    uses: steplix/steplix-actions/lambda/deploy-sam.yml
+    with:
+      environment: testing
+      pr-branch: staging
+    secrets:
+      aws-access-key-id: ${{ secrets.TEST_AWS_ACCESS_KEY_ID }}
+      aws-secret-access-key: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}
+      aws-region: ${{ secrets.TEST_AWS_REGION }}

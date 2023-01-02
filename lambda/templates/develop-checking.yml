@@ -1,0 +1,57 @@
+name: Develop checking
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - run: npm ci
+        working-directory: ./src
+      - run: npm test --if-present
+        working-directory: ./src
+      - run: npm run lint --if-present
+        working-directory: ./src
+      - name: Close workflow
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+
+  validate-sam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - uses: aws-actions/setup-sam@v1
+
+      - name: build SAM
+        run: sam build
+
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.TEST_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.TEST_AWS_REGION }}
+      
+      - name: validate SAM
+        run: sam validate
+
+      - name: Close workflow
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+
+  pr-to-staging:
+      needs: [test, validate-sam]
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v2
+        - uses: repo-sync/pull-request@v2
+          with:
+            destination_branch: testing
+            github_token: ${{ secrets.GITHUB_TOKEN }}

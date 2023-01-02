@@ -1,0 +1,66 @@
+name: Deploy lambda SAM
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      pr-branch:
+        type: string
+        required: false
+    secrets:
+      variables:
+        required: false
+      aws-access-key-id:
+        required: true
+      aws-secret-access-key:
+        required: true
+      aws-region:
+        required: true
+
+jobs:
+  check-aws-credentials:
+    runs-on: ubuntu-latest
+    outputs:
+      is-valid: ${{ steps.is-valid.outputs.is-valid }}
+    steps:
+        - id: is-valid
+          if: "${{ env.access-key != '' && env.secret-key != '' && env.region != '' }}"
+          run: echo "is-valid=true" >> $GITHUB_OUTPUT
+          env:
+              access-key: ${{ secrets.aws-access-key-id }}
+              secret-key: ${{ secrets.aws-secret-access-key }}
+              region: ${{ secrets.aws-region }}
+
+  build-deploy:
+    needs: check-aws-credentials
+    if: needs.check-aws-credentials.outputs.is-valid == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - uses: aws-actions/setup-sam@v1
+
+      - name: build SAM
+        run: sam build --config-env ${{ inputs.environment }}
+
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      
+      - name: deploy
+        run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --config-env ${{ inputs.environment }} --parameter-overrides Environment=${{ inputs.environment }} ${{ secrets.variables }}
+
+  generate-pr:
+    needs: build-deploy
+    if: ${{ inputs.pr-branch != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: ${{ inputs.pr-branch }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
