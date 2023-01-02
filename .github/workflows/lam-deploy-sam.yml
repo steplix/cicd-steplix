@@ -40,7 +40,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
-      - uses: aws-actions/setup-sam@latest
+      - uses: aws-actions/setup-sam@v2
+        with:
+          version: 1.59.0
 
       - name: build SAM
         run: sam build --config-env ${{ inputs.environment }}
