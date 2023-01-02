@@ -7,7 +7,7 @@ on:
 
 jobs:
   process-deploy:
-    uses: steplix/steplix-actions/.github/workflows/lam-deploy-sam.yml@latest
+    uses: steplix/steplix-actions/.github/workflows/lam-deploy-sam.yml@main
     with:
       environment: testing
       pr-branch: staging

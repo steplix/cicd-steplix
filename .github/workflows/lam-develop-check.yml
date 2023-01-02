@@ -1,0 +1,64 @@
+name: Develop checking
+
+on:
+  workflow_call:
+    secrets:
+      aws-access-key-id:
+        required: true
+      aws-secret-access-key:
+        required: true
+      aws-region:
+        required: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - run: npm ci
+        working-directory: ./src
+      - run: npm test --if-present
+        working-directory: ./src
+      - run: npm run lint --if-present
+        working-directory: ./src
+      - name: Close workflow
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+
+  validate-sam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v2
+      - uses: aws-actions/setup-sam@v2
+        with:
+          version: 1.59.0
+
+      - name: build SAM
+        run: sam build
+
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+      
+      - name: validate SAM
+        run: sam validate
+
+      - name: Close workflow
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+
+  pr-to-staging:
+      needs: [test, validate-sam]
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - uses: repo-sync/pull-request@v2
+          with:
+            destination_branch: testing
+            github_token: ${{ secrets.GITHUB_TOKEN }}
