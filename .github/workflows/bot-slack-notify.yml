@@ -1,4 +1,4 @@
-name: Slack notification bot
+name: Slack notify bot
 
 on:
   workflow_call:
