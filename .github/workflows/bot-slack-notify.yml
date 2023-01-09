@@ -11,6 +11,10 @@ on:
         type: string
         required: true
         description: Title to use before main Slack message
+      continue-on-error:
+        type: boolean
+        required: false
+        default: false
       username:
         type: string
         required: false
@@ -35,6 +39,9 @@ on:
         required: false
         description: User/Bot icon shown with Slack message. It uses the URL supplied to this env variable to display the icon in slack message
         default: https://avatars.githubusercontent.com/u/51715007?s=400&u=7be97d4589b5283f98f92556df75269487efee3a&v=4
+    secrets:
+      SLACK_WEBHOOK:
+        required: true
       
       
 jobs:
@@ -55,3 +62,4 @@ jobs:
         SLACK_MSG_AUTHOR: ${{ inputs.username }}
         SLACK_COLOR: ${{ inputs.color }}
         SLACK_FOOTER: ${{ inputs.footer }}
+      continue-on-error: ${{ inputs.continue-on-error }}
