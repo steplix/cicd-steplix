@@ -6,6 +6,6 @@ on:
 jobs:
   notify:
     uses: steplix/steplix-actions/.github/workflows/bot-slack-notify.yml@main
-    secrets:
+    with:
       title: Testing title with bot
       message: This is my message

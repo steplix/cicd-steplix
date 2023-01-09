@@ -14,7 +14,6 @@ on:
       username:
         type: string
         required: false
-        default: $GITHUB_ACTOR
         description: GitHub username of the person who has triggered the action. In case you want to modify it, please specify current GitHub username
       color:
         type: string
