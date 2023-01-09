@@ -1,0 +1,11 @@
+name: Slack notify
+
+on:
+  push
+
+jobs:
+  notify:
+    uses: steplix/steplix-actions/.github/workflows/bot-slack-notify.yml@main
+    secrets:
+      title: Testing title with bot
+      message: This is my message

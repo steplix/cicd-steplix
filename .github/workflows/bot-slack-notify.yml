@@ -19,7 +19,7 @@ on:
       color:
         type: string
         required: false
-        description: You can pass ${{ job.status }} for automatic coloring or an RGB value like #efefef which would change color on left side vertical line of Slack message
+        description: You can pass job.status for automatic coloring or an RGB value like \#efefef which would change color on left side vertical line of Slack message
         default: good
       footer:
         type: string
