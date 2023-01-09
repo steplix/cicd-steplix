@@ -34,7 +34,7 @@ on:
         type: string
         required: false
         description: User/Bot icon shown with Slack message. It uses the URL supplied to this env variable to display the icon in slack message
-        default: https://github.com/steplix/steplix-actions/blob/main/slack/steplix-img.png
+        default: https://avatars.githubusercontent.com/u/51715007?s=400&u=7be97d4589b5283f98f92556df75269487efee3a&v=4
       
       
 jobs:
