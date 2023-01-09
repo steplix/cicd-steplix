@@ -1,0 +1,58 @@
+name: Slack notification bot
+
+on:
+  workflow_call:
+    inputs:
+      message:
+        type: string
+        required: true
+        description: The main Slack message in attachment. It is advised not to override this
+      title:
+        type: string
+        required: true
+        description: Title to use before main Slack message
+      username:
+        type: string
+        required: false
+        default: $GITHUB_ACTOR
+        description: GitHub username of the person who has triggered the action. In case you want to modify it, please specify current GitHub username
+      color:
+        type: string
+        required: false
+        description: You can pass ${{ job.status }} for automatic coloring or an RGB value like #efefef which would change color on left side vertical line of Slack message
+        default: good
+      footer:
+        type: string
+        required: false
+        default: Triggered by Steplix actions
+        description: Slack message footer
+      channel:
+        type: string
+        required: false
+        description: Specify Slack channel in which message needs to be sent
+        default: steplix-cli-notifications
+      icon:
+        type: string
+        required: false
+        description: User/Bot icon shown with Slack message. It uses the URL supplied to this env variable to display the icon in slack message
+        default: https://github.com/steplix/steplix-actions/blob/main/slack/steplix-img.png
+      
+      
+jobs:
+  slackNotification:
+    name: Slack Notification
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Slack Notification
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_CHANNEL: ${{ inputs.channel }}
+        SLACK_ICON: ${{ inputs.icon }}
+        SLACK_MESSAGE: ${{ inputs.message }}
+        SLACK_TITLE: ${{ inputs.title }}
+        SLACK_USERNAME: Slack Bot
+        SLACK_MSG_AUTHOR: ${{ inputs.username }}
+        SLACK_COLOR: ${{ inputs.color }}
+        SLACK_FOOTER: ${{ inputs.footer }}
