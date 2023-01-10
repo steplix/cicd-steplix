@@ -8,6 +8,8 @@ on:
         default: testing
         required: false
     secrets:
+      slack-webhook:
+        required: true
       aws-access-key-id:
         required: true
       aws-secret-access-key:
@@ -53,7 +55,7 @@ jobs:
       
       - name: validate SAM
         run: sam validate
-
+      
       - name: Close workflow
         if: failure()
         uses: andymckay/cancel-action@0.2
@@ -63,7 +65,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: repo-sync/pull-request@v2
+      - name: generate-pr
+        id: open-pr
+        uses: repo-sync/pull-request@v2
         with:
           destination_branch: ${{ inputs.pr-branch }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Slack Notify
+        if: always()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.slack-webhook }}
+          SLACK_CHANNEL: steplix-cli-notifications
+          SLACK_ICON: https://avatars.githubusercontent.com/u/51715007?s=400&u=7be97d4589b5283f98f92556df75269487efee3a&v=4
+          SLACK_TITLE: New Pull Request in repository "${{ github.repository }}"
+          SLACK_MESSAGE: ${{ steps.open-pr.outputs.pr_url }} 
+          SLACK_USERNAME: Slack Bot
+          SLACK_MSG_AUTHOR: ${{ github.actor }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: Triggered by Steplix actions
+        continue-on-error: true

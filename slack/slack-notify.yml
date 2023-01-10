@@ -4,8 +4,19 @@ on:
   push
 
 jobs:
-  notify:
-    uses: steplix/steplix-actions/.github/workflows/bot-slack-notify.yml@main
-    with:
-      title: Testing title with bot
-      message: This is my message
+  notification:
+    steps:
+      - name: Slack Notify
+        if: always()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: back-test-pipes
+          SLACK_ICON: https://avatars.githubusercontent.com/u/51715007?s=400&u=7be97d4589b5283f98f92556df75269487efee3a&v=4
+          SLACK_TITLE: example title
+          SLACK_MESSAGE: Example message
+          SLACK_USERNAME: Slack Bot
+          SLACK_MSG_AUTHOR: ${{ github.actor }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_FOOTER: Triggered by Steplix actions
+        continue-on-error: true
