@@ -16,3 +16,4 @@ jobs:
       aws-access-key-id: ${{ secrets.STAGE_AWS_ACCESS_KEY_ID }}
       aws-secret-access-key: ${{ secrets.STAGE_AWS_SECRET_ACCESS_KEY }}
       aws-region: ${{ secrets.STAGE_AWS_REGION }}
+      slack-webhook: ${{ secrets.SLACK_WEBHOOK }}
