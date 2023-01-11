@@ -1,0 +1,153 @@
+stages:
+  - verify
+  - deploy-test
+  - deploy-stage
+  - deploy-prod
+
+.merge: &merge
+  script:
+    - git config --global user.name "$GITLAB_USER_NAME"
+    - git config --global user.email "$GITLAB_USER_EMAIL"
+    - git remote set-url origin "https://${STEPLIX_GITLAB_ACCESS_USER}:${STEPLIX_GITLAB_ACCESS_TOKEN}@${CI_REPOSITORY_URL#*@}"
+    - git fetch --all
+    - git checkout ${BRANCH}
+    - git merge origin/${ORIGIN} -m "Pipeline - Auto merge ${BRANCH} with ${ORIGIN}"
+    - git push -f origin ${BRANCH}
+
+validate:sam:
+  stage: verify
+  image: public.ecr.aws/sam/build-nodejs16.x
+  only:
+    - develop
+  script:
+    - sam build
+    - sam validate --config-env testing
+  environment: testing
+
+npm:
+  stage: verify
+  image: node:18-alpine
+  only:
+    - develop
+  script:
+    - npm config set registry ${CI_NPM_REGISTRY}
+    - cd src/
+    - npm ci
+  cache:
+    paths:
+      - node_modules/
+  artifacts:
+    expire_in: 10 minutes
+    when: on_success
+    paths:
+      - node_modules/
+
+test:
+  stage: verify
+  image: node:18-alpine
+  only:
+    - develop
+  needs:
+    - npm
+  script:
+    - cd src/
+    - npm test --if-present
+
+lint:
+  stage: verify
+  image: node:18-alpine
+  only:
+    - develop
+  needs:
+    - npm
+  script:
+    - cd src/
+    - npm run lint --if-present
+
+merge:test:
+  stage: deploy-test
+  only:
+    - develop
+  needs:
+    - validate:sam
+    - test
+    - lint
+  when: manual
+  allow_failure: false
+  <<: *merge
+  variables:
+    BRANCH: testing
+    ORIGIN: develop
+
+deploy:test:
+  stage: deploy-test
+  image: public.ecr.aws/sam/build-nodejs16.x
+  only:
+    - develop
+  needs:
+    - merge:test
+  script:
+    - git fetch --all
+    - git checkout testing
+    - git pull
+    - sam build
+    - sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --config-env testing --parameter-overrides Environment=testing
+  environment: testing
+
+merge:stage:
+  stage: deploy-stage
+  only:
+    - develop
+  needs:
+    - deploy:test
+  when: manual
+  allow_failure: false
+  <<: *merge
+  variables:
+    BRANCH: staging
+    ORIGIN: testing
+
+deploy:stage:
+  stage: deploy-stage
+  image: public.ecr.aws/sam/build-nodejs16.x
+  only:
+    - develop
+  needs:
+    - merge:stage
+  script:
+    - git fetch --all
+    - git checkout staging
+    - git pull
+    - sam validate --config-env staging
+    - sam build
+    - sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --config-env staging --parameter-overrides Environment=staging "$TEMPLATE_VARS"
+  environment: staging
+
+merge:master:
+  stage: deploy-prod
+  only:
+    - develop
+  needs:
+    - deploy:stage
+  when: manual
+  allow_failure: false
+  <<: *merge
+  variables:
+    BRANCH: master
+    ORIGIN: staging
+
+deploy:prod:
+  stage: deploy-prod
+  image: public.ecr.aws/sam/build-nodejs16.x
+  only:
+    - develop
+  needs:
+    - merge:master
+  script:
+    - git fetch --all
+    - git checkout master
+    - git pull
+    - sam validate --config-env production
+    - sam build
+    - sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --config-env production --parameter-overrides Environment=production "$TEMPLATE_VARS"
+  environment: production
