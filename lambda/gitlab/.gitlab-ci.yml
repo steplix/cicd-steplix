@@ -23,44 +23,17 @@ validate:sam:
     - sam validate --config-env testing
   environment: testing
 
-npm:
+verify:
   stage: verify
   image: node:18-alpine
   only:
     - develop
-  script:
+  before_script:
     - npm config set registry ${CI_NPM_REGISTRY}
     - cd src/
     - npm ci
-  cache:
-    paths:
-      - node_modules/
-  artifacts:
-    expire_in: 10 minutes
-    when: on_success
-    paths:
-      - node_modules/
-
-test:
-  stage: verify
-  image: node:18-alpine
-  only:
-    - develop
-  needs:
-    - npm
   script:
-    - cd src/
     - npm test --if-present
-
-lint:
-  stage: verify
-  image: node:18-alpine
-  only:
-    - develop
-  needs:
-    - npm
-  script:
-    - cd src/
     - npm run lint --if-present
 
 deploy:test:
@@ -72,8 +45,7 @@ deploy:test:
     - develop
   needs:
     - validate:sam
-    - test
-    - lint
+    - verify
   variables:
     BRANCH: testing
     ORIGIN: develop
