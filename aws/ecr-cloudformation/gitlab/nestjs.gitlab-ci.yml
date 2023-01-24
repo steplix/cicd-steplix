@@ -74,6 +74,6 @@ merge-request:
     - documentation
   before_script:
     - apk --cache-dir $APK_CACHE_DIR add curl bash
-    - wget -O - https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/create-mr.sh >> create-mr.sh
+    - wget -O - https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/create-mr.sh >> create-mr.sh
   script:
     - sh create-mr.sh
