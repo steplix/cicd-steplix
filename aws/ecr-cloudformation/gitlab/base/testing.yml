@@ -1,0 +1,56 @@
+docker:test:
+  stage: docker
+  image: docker:rc
+  allow_failure: false
+  services:
+    - docker:dind
+  before_script:
+    - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
+    - pip install awscli
+    - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+    - DOCKER_URL=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${AWS_ECR_REPOSITORY}
+  script:
+    - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin ${DOCKER_URL}
+    - LATEST=$(aws ecr describe-images --repository-name ${AWS_ECR_REPOSITORY} --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' --output text)
+    - docker buildx build --push -t ${DOCKER_URL}:${CI_COMMIT_SHORT_SHA} --cache-to=type=inline --cache-from=type=registry,ref=${DOCKER_URL}:${LATEST} .;
+  environment: testing
+
+deploy:test:
+  stage: deploy
+  image: alpine
+  allow_failure: false
+  needs:
+    - docker:test
+  rules:
+    - if: $ENV_AWS_ECS_NAME != null
+      variables:
+        STACK_PREFIX: $ENV_AWS_ECS_NAME
+    - when: always
+      variables:
+        STACK_PREFIX: $CI_PROJECT_NAME
+  before_script:
+    - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
+    - pip install awscli
+  script:
+    - >
+      aws cloudformation deploy
+      --template-file ./cloudformation/cloudformation.yml
+      --stack-name ${STACK_PREFIX}-testing
+      --no-fail-on-empty-changeset
+      --region ${AWS_DEFAULT_REGION}
+      --parameter-overrides Environment=testing ParameterSuffix=Testing EnvAwsECRImage=${AWS_ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA} ${AWS_CLOUDFORMATION_PARAMS_OVERRIDE}
+  environment: testing
+
+merge-request:test:
+  stage: merge-request
+  image: alpine
+  allow_failure: false
+  needs:
+    - deploy:test
+  variables:
+    TARGET: master
+  before_script:
+    - apk --cache-dir $APK_CACHE_DIR add curl bash
+    - wget -O - https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/create-mr.sh >> create-mr.sh
+  script:
+    - sh create-mr.sh

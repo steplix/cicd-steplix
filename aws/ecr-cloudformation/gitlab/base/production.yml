@@ -1,0 +1,93 @@
+variables:
+  VERSION: $CI_COMMIT_TAG
+
+docker:verify-production:
+  stage: docker
+  image: alpine
+  allow_failure: false
+  when: manual
+  before_script:
+    - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
+    - pip install awscli
+  script:
+    - echo "Searching image by TAG"
+    - echo "AWS_ECR_REPOSITORY = ${AWS_ECR_REPOSITORY}"
+    - ECR_IMAGE=$(aws ecr list-images --repository-name ${AWS_ECR_REPOSITORY} --query "imageIds[?imageTag=='${VERSION}'].imageDigest" --output text)
+    - echo "HAVE_IMAGE=$(if [[ -z "${ECR_IMAGE}" ]]; then echo false; else echo true; fi)" >> build.env
+  artifacts:
+    expire_in: 30 mins
+    reports:
+      dotenv: build.env
+  environment: production
+
+docker:get-staging:
+  stage: docker
+  image: docker:rc
+  allow_failure:
+    exit_codes: 8
+  services:
+    - docker:dind
+  needs:
+    - job: docker:verify-production
+      artifacts: true
+  before_script:
+    - if [[ ${HAVE_IMAGE} == true ]]; then exit 8; fi
+    - apk add --cache-dir $APK_CACHE_DIR python3 py-pip gzip
+    - pip install awscli
+    - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+    - DOCKER_URL=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${AWS_ECR_REPOSITORY}
+  script:
+    - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin ${DOCKER_URL}
+    - docker pull ${DOCKER_URL}:${VERSION}
+    - docker save ${DOCKER_URL}:${VERSION} | gzip > release-${VERSION}.tar.gz
+  artifacts:
+    paths:
+      - release-${VERSION}.tar.gz
+    expire_in: 30 mins
+  environment: staging
+
+docker:production:
+  stage: docker
+  image: docker:rc
+  allow_failure:
+    exit_codes: 8
+  services:
+    - docker:dind
+  needs:
+    - job: docker:verify-production
+      artifacts: true
+    - job: docker:get-staging
+      artifacts: true
+  before_script:
+    - if [[ ${HAVE_IMAGE} == true ]]; then exit 8; fi
+    - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
+    - pip install awscli
+    - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+    - DOCKER_URL=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${AWS_ECR_REPOSITORY}
+  script:
+    - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin ${DOCKER_URL}
+    - LOAD_OUTPUT=$(docker load < release-${VERSION}.tar.gz)
+    - |
+      SOURCE_IMAGE=$(echo ${LOAD_OUTPUT} | sed 's/Loaded image: //')
+    - docker tag "${SOURCE_IMAGE}" "${DOCKER_URL}:${VERSION}"
+    - docker push ${DOCKER_URL}:${VERSION}
+  environment: production
+
+deploy:production:
+  stage: deploy
+  image: alpine
+  allow_failure: false
+  needs:
+    - docker:production
+  before_script:
+    - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
+    - pip install awscli
+  script:
+    - >
+      aws cloudformation deploy
+      --template-file ./cloudformation/cloudformation.yml
+      --stack-name ${CI_PROJECT_NAME}-production
+      --no-fail-on-empty-changeset
+      --region ${AWS_DEFAULT_REGION}
+      --parameter-overrides Environment=production ParameterSuffix=Production EnvAwsECRImage=${AWS_ECR_REPOSITORY}:${CI_COMMIT_TAG} ${AWS_CLOUDFORMATION_PARAMS_OVERRIDE}
+  environment: production

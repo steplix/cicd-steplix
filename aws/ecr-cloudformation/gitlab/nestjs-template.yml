@@ -1,0 +1,78 @@
+stages:
+  - validate
+  - pre-tag
+  - release
+  - docker
+  - tag
+  - deploy
+  - merge-request
+
+variables:
+  APK_CACHE_DIR: $CI_PROJECT_DIR/.cache/apk
+
+cache:
+  paths:
+    - $CI_PROJECT_DIR/.cache/pip
+    - $APK_CACHE_DIR
+
+include:
+  - remote: 'https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/testing.yml'
+    rules:
+      - if: $CI_COMMIT_BRANCH == "testing" && $CI_PIPELINE_SOURCE == "push"
+
+  - local: 'https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/staging.yml'
+    rules:
+      - if: $CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "push"
+
+  - local: 'https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/production.yml'
+    rules:
+      - if: $CI_COMMIT_TAG
+
+verify:
+  stage: validate
+  image: node:18-alpine
+  cache:
+    paths:
+      - node_modules
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop" && $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_COMMIT_BRANCH =~ /^(hotfix\/)*/ && $CI_PIPELINE_SOURCE == "push"
+  before_script:
+    - npm config set registry ${CI_NPM_REGISTRY}
+    - npm ci --prefer-offline
+  script:
+    - npm test --if-present
+    - npm run lint --if-present
+
+documentation:
+  stage: validate
+  image: node:18-alpine
+  cache:
+    paths:
+      - node_modules
+  only:
+    - develop
+  before_script:
+    - npm install -g @compodoc/compodoc
+  script:
+    - npm run doc:gen
+  artifacts:
+    paths:
+      - public
+
+merge-request:
+  stage: merge-request
+  image: alpine
+  allow_failure: false
+  only:
+    - develop
+  variables:
+    TARGET: testing
+  needs:
+    - verify
+    - documentation
+  before_script:
+    - apk --cache-dir $APK_CACHE_DIR add curl bash
+    - wget -O - https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/create-mr.sh >> create-mr.sh
+  script:
+    - sh create-mr.sh
