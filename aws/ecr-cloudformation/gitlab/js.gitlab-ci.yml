@@ -47,8 +47,9 @@ verify:
     - npm run lint --if-present
 
 merge-request:
-  extends: .merge-request
   stage: merge-request
+  image: alpine
+  allow_failure: false
   only:
     - develop
   variables:
@@ -56,3 +57,8 @@ merge-request:
   needs:
     - verify
     - documentation
+  before_script:
+    - apk --cache-dir $APK_CACHE_DIR add curl bash
+    - wget -O - https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/create-mr.sh >> create-mr.sh
+  script:
+    - sh create-mr.sh
