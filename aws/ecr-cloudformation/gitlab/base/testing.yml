@@ -1,6 +1,3 @@
-include:
-  - remote: 'https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/mr.yml'
-
 docker:test:
   stage: docker
   image: docker:rc
