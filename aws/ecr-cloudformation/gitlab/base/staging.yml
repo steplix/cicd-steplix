@@ -50,7 +50,7 @@ docker:staging:
       sed -i 's/\"version\":\s*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"${VERSION}\"/g' package.json
 
     - docker buildx build --push -t ${DOCKER_URL}:${VERSION} --cache-to=type=inline --cache-from=type=registry,ref=${DOCKER_URL}:${LATEST} .;
-  environment: staging
+  environment: ${STAGING}
 
 tag:
   stage: tag
@@ -73,6 +73,8 @@ deploy:staging:
   stage: deploy
   image: alpine
   allow_failure: false
+  rules:
+    - if: $STAGING == "staging"
   needs:
     - tag
   before_script:

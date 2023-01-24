@@ -9,6 +9,7 @@ stages:
 
 variables:
   APK_CACHE_DIR: $CI_PROJECT_DIR/.cache/apk
+  STAGING: staging # If don't use "staging" change this variable to "production"
 
 cache:
   paths:
