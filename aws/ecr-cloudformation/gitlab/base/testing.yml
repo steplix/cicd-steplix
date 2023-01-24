@@ -46,6 +46,7 @@ deploy:test:
 
 merge-request:test:
   extends: .merge-request
+  stage: merge-request
   needs:
     - deploy:test
   variables:

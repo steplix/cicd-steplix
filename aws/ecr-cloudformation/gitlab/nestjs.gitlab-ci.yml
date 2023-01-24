@@ -64,6 +64,7 @@ documentation:
 
 merge-request:
   extends: .merge-request
+  stage: merge-request
   only:
     - develop
   variables:
