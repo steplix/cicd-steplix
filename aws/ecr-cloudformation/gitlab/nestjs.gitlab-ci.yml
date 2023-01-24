@@ -17,15 +17,16 @@ cache:
     - $APK_CACHE_DIR
 
 include:
-  - remote: 'https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/testing.yml'
+  - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/mr.yml
+  - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/testing.yml
     rules:
       - if: $CI_COMMIT_BRANCH == "testing" && $CI_PIPELINE_SOURCE == "push"
 
-  - local: 'https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/staging.yml'
+  - local: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/staging.yml
     rules:
       - if: $CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "push"
 
-  - local: 'https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/production.yml'
+  - local: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/production.yml
     rules:
       - if: $CI_COMMIT_TAG
 
@@ -62,9 +63,7 @@ documentation:
       - public
 
 merge-request:
-  stage: merge-request
-  image: alpine
-  allow_failure: false
+  extends: .merge-request
   only:
     - develop
   variables:
@@ -72,8 +71,3 @@ merge-request:
   needs:
     - verify
     - documentation
-  before_script:
-    - apk --cache-dir $APK_CACHE_DIR add curl bash
-    - wget -O - https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/create-mr.sh >> create-mr.sh
-  script:
-    - sh create-mr.sh
