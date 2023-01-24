@@ -20,13 +20,13 @@ include:
   - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/mr.yml
   - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/testing.yml
     rules:
-      - if: $CI_COMMIT_BRANCH == "testing" && $CI_PIPELINE_SOURCE == "push"
+      - if: $CI_COMMIT_BRANCH == "testing"
 
-  - local: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/staging.yml
+  - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/staging.yml
     rules:
-      - if: $CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "push"
+      - if: $CI_COMMIT_BRANCH == "master"
 
-  - local: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/production.yml
+  - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/production.yml
     rules:
       - if: $CI_COMMIT_TAG
 
@@ -36,9 +36,9 @@ verify:
   cache:
     paths:
       - node_modules
-  rules:
-    - if: $CI_COMMIT_BRANCH == "develop" && $CI_PIPELINE_SOURCE == "push"
-    - if: $CI_COMMIT_BRANCH =~ /^(hotfix\/)*/ && $CI_PIPELINE_SOURCE == "push"
+  only:
+    - develop
+    - /^hotfix/
   before_script:
     - npm config set registry ${CI_NPM_REGISTRY}
     - npm ci --prefer-offline

@@ -18,9 +18,6 @@ LIST_MR=`curl --silent "${URL}/merge_requests?state=opened" --header "PRIVATE-TO
 COUNT_BRANCHES=`echo ${LIST_MR} | grep -o "\"source_branch\":\"${SOURCE}\"" | wc -l`;
 CURL_RESPONSE='';
 
-echo ${URL};
-echo ${BODY};
-
 if [ ${COUNT_BRANCHES} -eq "0" ]; then
     CURL_RESPONSE=`curl -s -w '%{http_code}' --silent --output /dev/null -X POST "${URL}/merge_requests" --header "PRIVATE-TOKEN: ${PRIVATE_TOKEN}" --header "Content-Type: application/json" --data "${BODY}"`;
 
