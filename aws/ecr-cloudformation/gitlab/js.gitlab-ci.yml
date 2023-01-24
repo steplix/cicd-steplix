@@ -17,7 +17,6 @@ cache:
     - $APK_CACHE_DIR
 
 include:
-  - remote: 'https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/mr.yml'
   - remote: 'https://github.com/steplix/steplix-actions/blob/main/aws/ecr-cloudformation/gitlab/base/testing.yml'
     rules:
       - if: $CI_COMMIT_BRANCH == "testing" && $CI_PIPELINE_SOURCE == "push"
