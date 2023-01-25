@@ -1,4 +1,4 @@
-.pre:
+workflow:
   rules:
     - if: $CI_COMMIT_MESSAGE =~ /#skip-pipeline/
       when: never
