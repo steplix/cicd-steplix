@@ -16,7 +16,21 @@ cache:
     - $CI_PROJECT_DIR/.cache/pip
     - $APK_CACHE_DIR
 
+.verify:
+  stage: validate
+  image: node:18-alpine
+  cache:
+    paths:
+      - node_modules
+  before_script:
+    - npm config set registry ${CI_NPM_REGISTRY}
+    - npm ci --prefer-offline
+  script:
+    - npm test --if-present
+    - npm run lint --if-present
+
 include:
+  - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/skip-pipe.yml
   - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/mr.yml
   - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/testing.yml
     rules:
@@ -31,20 +45,9 @@ include:
       - if: $CI_COMMIT_TAG
 
 verify:
-  stage: validate
-  image: node:18-alpine
-  cache:
-    paths:
-      - node_modules
+  extends: .verify
   only:
     - develop
-    - /^hotfix/
-  before_script:
-    - npm config set registry ${CI_NPM_REGISTRY}
-    - npm ci --prefer-offline
-  script:
-    - npm test --if-present
-    - npm run lint --if-present
 
 documentation:
   stage: validate

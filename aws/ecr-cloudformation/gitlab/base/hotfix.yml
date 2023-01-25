@@ -1,0 +1,24 @@
+include:
+  - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/mr.yml
+
+verify:
+  extends: .verify
+
+merge-request:develop:
+  extends: .merge-request
+  stage: merge-request
+  needs:
+    - verify
+  variables:
+    TARGET: develop
+    DELETE_SOURCE_BRANCH: true
+    TITLE: <skip-pipeline> Hot-fix
+
+merge-request:master:
+  extends: .merge-request
+  stage: merge-request
+  needs:
+    - verify
+  variables:
+    TARGET: master
+    TITLE: Hot-fix
