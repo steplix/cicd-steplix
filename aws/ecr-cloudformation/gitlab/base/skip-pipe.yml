@@ -2,3 +2,4 @@ skip-pipe:
   rules:
     - if: $CI_COMMIT_MESSAGE =~ /#skip-pipeline/
       when: never
+    - when: always
