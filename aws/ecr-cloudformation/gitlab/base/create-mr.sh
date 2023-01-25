@@ -17,7 +17,7 @@ echo "BODY TO SEND: ${BODY}";
 
 URL=`echo ${CI_PROJECT_URL} | awk -F[/:] '{print $1"://"$4}'`"/api/v4/projects/${CI_PROJECT_ID}"
 LIST_MR=`curl --silent "${URL}/merge_requests?state=opened" --header "PRIVATE-TOKEN: ${PRIVATE_TOKEN}"`;
-COUNT_BRANCHES=`echo ${LIST_MR} | grep -o "\"source_branch\":\"${SOURCE}\"" | wc -l`;
+COUNT_BRANCHES=`echo ${LIST_MR} | grep -E "\"source_branch\":\"${SOURCE}\"" | grep -E "\"target_branch\":\"${TARGET}\"" | wc -l`;
 CURL_RESPONSE='';
 
 if [ ${COUNT_BRANCHES} -eq "0" ]; then
