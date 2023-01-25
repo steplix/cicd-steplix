@@ -2,6 +2,9 @@
 
 SOURCE="${CI_COMMIT_BRANCH}"
 PRIVATE_TOKEN="${STEPLIX_GITLAB_ACCESS_TOKEN}";
+
+echo "PRIVATE_TOKEN: ${PRIVATE_TOKEN}";
+
 DELETE_SOURCE_BRANCH=`if "${DELETE_SOURCE_BRANCH}" == "true"; then echo true; else echo false; fi`;
 TITLE=`if [ -z "${TITLE}" ]; then echo "Merge ${SOURCE} on ${TARGET}"; else echo ${TITLE}; fi`
 BODY="{
@@ -20,9 +23,6 @@ URL=`echo ${CI_PROJECT_URL} | awk -F[/:] '{print $1"://"$4}'`"/api/v4/projects/$
 echo "URL TO SEND: ${URL}";
 
 LIST_MR=`curl --silent "${URL}/merge_requests?state=opened" --header "PRIVATE-TOKEN: ${PRIVATE_TOKEN}"`;
-
-echo "LIST MR: ${LSIT_MR}";
-
 COUNT_BRANCHES=`echo ${LIST_MR} | grep -E "\"source_branch\":\"${SOURCE}\"" | grep -E "\"target_branch\":\"${TARGET}\"" | wc -l`;
 CURL_RESPONSE='';
 
