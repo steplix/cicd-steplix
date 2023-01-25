@@ -16,19 +16,6 @@ cache:
     - $CI_PROJECT_DIR/.cache/pip
     - $APK_CACHE_DIR
 
-.verify:
-  stage: validate
-  image: node:18-alpine
-  cache:
-    paths:
-      - node_modules
-  before_script:
-    - npm config set registry ${CI_NPM_REGISTRY}
-    - npm ci --prefer-offline
-  script:
-    - npm test --if-present
-    - npm run lint --if-present
-
 include:
   - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/pre.yml
   - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/mr.yml
@@ -43,10 +30,19 @@ include:
   - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/production.yml
     rules:
       - if: $CI_COMMIT_TAG
-  
-  - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/hotfix.yml
-    rules:
-      - if: $CI_COMMIT_BRANCH =~ /^hotfix/
+
+.verify:
+  stage: validate
+  image: node:18-alpine
+  cache:
+    paths:
+      - node_modules
+  before_script:
+    - npm config set registry ${CI_NPM_REGISTRY}
+    - npm ci --prefer-offline
+  script:
+    - npm test --if-present
+    - npm run lint --if-present
 
 verify:
   extends: .verify
@@ -62,3 +58,32 @@ merge-request:
     TARGET: testing
   needs:
     - verify
+
+# Hot Fix
+verify:hotfix:
+  extends: .verify
+  only:
+    - /^hotfix/
+
+mr-develop:hotfix:
+  extends: .merge-request
+  stage: merge-request
+  needs:
+    - verify:hotfix
+  only:
+    - /^hotfix/
+  variables:
+    TARGET: develop
+    DELETE_SOURCE_BRANCH: 'true'
+    TITLE: '#skip-pipeline Hot-fix'
+
+mr-master:hotfix:
+  extends: .merge-request
+  stage: merge-request
+  needs:
+    - verify:hotfix
+  only:
+    - /^hotfix/
+  variables:
+    TARGET: master
+    TITLE: Hot-fix
