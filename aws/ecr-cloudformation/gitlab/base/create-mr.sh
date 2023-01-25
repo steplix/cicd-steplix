@@ -2,7 +2,7 @@
 
 SOURCE="${CI_COMMIT_BRANCH}"
 PRIVATE_TOKEN="${STEPLIX_GITLAB_ACCESS_TOKEN}";
-DELETE_SOURCE_BRANCH=`if [[ "${DELETE_SOURCE_BRANCH}" == "true" ]]; then echo true; else echo false; fi`
+DELETE_SOURCE_BRANCH=`if "${DELETE_SOURCE_BRANCH}" == "true"; then echo true; else echo false; fi`;
 TITLE=`if [ -z "${TITLE}" ]; then echo "Merge ${SOURCE} on ${TARGET}"; else echo ${TITLE}; fi`
 BODY="{
     \"id\": ${CI_PROJECT_ID},
@@ -13,6 +13,7 @@ BODY="{
     \"remove_source_branch\": ${DELETE_SOURCE_BRANCH}
 }";
 
+echo "URL TO SEND: ${URL}"
 echo "BODY TO SEND: ${BODY}";
 
 URL=`echo ${CI_PROJECT_URL} | awk -F[/:] '{print $1"://"$4}'`"/api/v4/projects/${CI_PROJECT_ID}"
