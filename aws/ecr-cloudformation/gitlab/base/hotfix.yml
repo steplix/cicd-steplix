@@ -11,7 +11,7 @@ merge-request:develop:
     - verify
   variables:
     TARGET: develop
-    DELETE_SOURCE_BRANCH: true
+    DELETE_SOURCE_BRANCH: 'true'
     TITLE: <skip-pipeline> Hot-fix
 
 merge-request:master:
