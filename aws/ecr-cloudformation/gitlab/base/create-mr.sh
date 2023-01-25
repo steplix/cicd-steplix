@@ -2,9 +2,6 @@
 
 SOURCE="${CI_COMMIT_BRANCH}"
 PRIVATE_TOKEN="${STEPLIX_GITLAB_ACCESS_TOKEN}";
-
-echo "PRIVATE_TOKEN: ${PRIVATE_TOKEN}";
-
 DELETE_SOURCE_BRANCH=`if "${DELETE_SOURCE_BRANCH}" == "true"; then echo true; else echo false; fi`;
 TITLE=`if [ -z "${TITLE}" ]; then echo "Merge ${SOURCE} on ${TARGET}"; else echo ${TITLE}; fi`
 BODY="{
