@@ -4,17 +4,16 @@ pre:tag:
   allow_failure: false
   variables:
     BASE_VERSION: '0.0.0'
-    MINOR_VERSION: minor
-    MAYOR_VERSION: mayor
+    MINOR_VERSION: '#minor'
+    MAYOR_VERSION: '#mayor'
   before_script:
     - apk --cache-dir $APK_CACHE_DIR add git
   script:
     - git fetch --all --tags
     - TAG_ID=$(git rev-list --tags --max-count=1)
     - LAST_TAG=$(if [[ -z "$TAG_ID" ]]; then echo "${BASE_VERSION}"; else echo $(git describe --tags ${TAG_ID}); fi)
-    - MESSAGE=$(echo "${CI_COMMIT_MESSAGE}" | sed -n "s/^<\([^>]*\)>.*$/\1/p")
-    - VERSION_TO_UPDATE=$(if [[ "$MESSAGE" == *"${MINOR_VERSION}"* ]]; then echo 1; else echo 0; fi)
-    - VERSION_TO_UPDATE=$(if [[ "$MESSAGE" == *"${MAYOR_VERSION}"* ]]; then echo 2; else echo 0; fi)
+    - VERSION_TO_UPDATE=$([[ "$CI_COMMIT_MESSAGE" == *${MINOR_VERSION}* ]] && echo 1 || echo 0)
+    - VERSION_TO_UPDATE=$([[ "$CI_COMMIT_MESSAGE" == *${MAYOR_VERSION}* ]] && echo 2 || echo 0)
 
     - echo "LAST_TAG = ${LAST_TAG}"
 
