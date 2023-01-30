@@ -1,11 +1,37 @@
 variables:
   VERSION: $CI_COMMIT_TAG
 
+docker:production:
+  stage: docker
+  image: docker:rc
+  allow_failure: false
+  when: manual
+  services:
+    - docker:dind
+  rules:
+    - if: $SKIP_STAGING == "true"
+  before_script:
+    - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
+    - pip install awscli
+    - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+    - DOCKER_URL=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${AWS_ECR_REPOSITORY}
+  script:
+    - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin ${DOCKER_URL}
+    - LATEST=$(aws ecr describe-images --repository-name ${AWS_ECR_REPOSITORY} --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' --output text)
+
+    - |
+      sed -i 's/\"version\":\s*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"${VERSION}\"/g' package.json
+
+    - docker buildx build --push -t ${DOCKER_URL}:${VERSION} --cache-to=type=inline --cache-from=type=registry,ref=${DOCKER_URL}:${LATEST} .;
+  environment: production
+
 docker:verify-production:
   stage: docker
   image: alpine
   allow_failure: false
   when: manual
+  rules:
+    - if: $SKIP_STAGING == "false"
   before_script:
     - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
     - pip install awscli
@@ -25,6 +51,8 @@ docker:get-staging:
   image: docker:rc
   services:
     - docker:dind
+  rules:
+    - if: $SKIP_STAGING == "false"
   needs:
     - job: docker:verify-production
       artifacts: true
@@ -49,6 +77,8 @@ docker:production:
   image: docker:rc
   services:
     - docker:dind
+  rules:
+    - if: $SKIP_STAGING == "false"
   needs:
     - job: docker:verify-production
       artifacts: true
