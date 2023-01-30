@@ -60,7 +60,8 @@ tag:
   needs:
     - job: pre:tag
       artifacts: true
-    - docker:staging
+    - job: docker:staging
+      optional: true
   before_script:
     - apk --cache-dir $APK_CACHE_DIR add git
     - git config --global user.name "$GITLAB_USER_NAME"
