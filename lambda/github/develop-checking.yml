@@ -7,7 +7,7 @@ on:
 
 jobs:
   checking-process:
-    uses: steplix/steplix-actions/.github/workflows/lam-develop-check.yml@main
+    uses: steplix/cicd-steplix/.github/workflows/lam-develop-check.yml@main
     secrets:
       aws-access-key-id: ${{ secrets.TEST_AWS_ACCESS_KEY_ID }}
       aws-secret-access-key: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}

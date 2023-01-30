@@ -1,5 +1,5 @@
 include:
-  - remote: https://raw.githubusercontent.com/steplix/steplix-actions/main/aws/ecr-cloudformation/gitlab/base/mr.yml
+  - remote: https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/gitlab/base/mr.yml
 
 docker:test:
   stage: docker
