@@ -22,6 +22,9 @@ pre:tag:
     - echo "NEW_TAG = ${VERSION}"
 
     - echo "VERSION=${VERSION}" >> build.env
+
+    - ECR_ENV=$([[ $SKIP_STAGING == 'true' ]] && echo 'production' || echo 'staging')
+    - echo "ECR_ENV=${ECR_ENV}" >> build.env
   artifacts:
     expire_in: 30 mins
     reports:
@@ -49,7 +52,7 @@ docker:staging:
       sed -i 's/\"version\":\s*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"${VERSION}\"/g' package.json
 
     - docker buildx build --push -t ${DOCKER_URL}:${VERSION} --cache-to=type=inline --cache-from=type=registry,ref=${DOCKER_URL}:${LATEST} .;
-  environment: ${STAGING}
+  environment: ${ECR_ENV}
 
 tag:
   stage: tag
@@ -73,7 +76,7 @@ deploy:staging:
   image: alpine
   allow_failure: false
   rules:
-    - if: $STAGING == "staging"
+    - if: $SKIP_STAGING == "false"
   needs:
     - tag
   before_script:

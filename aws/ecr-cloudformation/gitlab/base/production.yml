@@ -23,15 +23,13 @@ docker:verify-production:
 docker:get-staging:
   stage: docker
   image: docker:rc
-  allow_failure:
-    exit_codes: 8
   services:
     - docker:dind
   needs:
     - job: docker:verify-production
       artifacts: true
   before_script:
-    - if [[ ${HAVE_IMAGE} == true ]]; then exit 8; fi
+    - if [[ ${HAVE_IMAGE} == true ]]; then echo 'Skip pipe because image already exist in production'; exit 0; fi
     - apk add --cache-dir $APK_CACHE_DIR python3 py-pip gzip
     - pip install awscli
     - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
@@ -49,8 +47,6 @@ docker:get-staging:
 docker:production:
   stage: docker
   image: docker:rc
-  allow_failure:
-    exit_codes: 8
   services:
     - docker:dind
   needs:
@@ -59,7 +55,7 @@ docker:production:
     - job: docker:get-staging
       artifacts: true
   before_script:
-    - if [[ ${HAVE_IMAGE} == true ]]; then exit 8; fi
+    - if [[ ${HAVE_IMAGE} == true ]]; then echo 'Skip pipe because image already exist in production'; exit 0; fi
     - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
     - pip install awscli
     - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
