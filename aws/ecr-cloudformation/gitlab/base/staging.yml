@@ -27,6 +27,26 @@ pre:tag:
     reports:
       dotenv: build.env
 
+docker:build:
+  stage: docker
+  image: docker:rc
+  allow_failure: false
+  services:
+    - docker:dind
+  needs:
+    - job: pre:tag
+      artifacts: true
+  script:
+    - |
+      sed -i 's/\"version\":\s*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"${VERSION}\"/g' package.json
+
+    - docker build -t release:${VERSION};
+    - docker save release:${VERSION} | gzip > release-${VERSION}.tar.gz
+  artifacts:
+    paths:
+      - release-${VERSION}.tar.gz
+    expire_in: 60 mins
+
 docker:staging:
   stage: docker
   image: docker:rc
@@ -38,6 +58,8 @@ docker:staging:
   needs:
     - job: pre:tag
       artifacts: true
+    - job: docker:build
+      artifacts: true
   before_script:
     - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
     - pip install awscli
@@ -45,13 +67,38 @@ docker:staging:
     - DOCKER_URL=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${AWS_ECR_REPOSITORY}
   script:
     - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin ${DOCKER_URL}
-    - LATEST=$(aws ecr describe-images --repository-name ${AWS_ECR_REPOSITORY} --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' --output text)
-
-    - |
-      sed -i 's/\"version\":\s*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"${VERSION}\"/g' package.json
-
-    - docker buildx build --push -t ${DOCKER_URL}:${VERSION} --cache-to=type=inline --cache-from=type=registry,ref=${DOCKER_URL}:${LATEST} .;
+    - docker load < release-${VERSION}.tar.gz
+    - docker tag "release:${VERSION}" "${DOCKER_URL}:${VERSION}"
+    - docker push ${DOCKER_URL}:${VERSION}
   environment: staging
+
+docker:production:
+  stage: docker
+  image: docker:rc
+  allow_failure: false
+  services:
+    - docker:dind
+  needs:
+    - job: pre:tag
+      artifacts: true
+    - job: docker:build
+      artifacts: true
+    - job: docker:staging
+      optional: true
+  before_script:
+    - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
+    - pip install awscli
+    - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+    - DOCKER_URL=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${AWS_ECR_REPOSITORY}
+  script:
+    - ECR_IMAGE=$(aws ecr list-images --repository-name ${AWS_ECR_REPOSITORY} --query "imageIds[?imageTag=='${VERSION}'].imageDigest" --output text)
+    - if [[ ! -z "${ECR_IMAGE}" ]]; then echo "Docker image with this image already exist"; exit 0; fi
+
+    - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin ${DOCKER_URL}
+    - docker load < release-${VERSION}.tar.gz
+    - docker tag "release:${VERSION}" "${DOCKER_URL}:${VERSION}"
+    - docker push ${DOCKER_URL}:${VERSION}
+  environment: production
 
 tag:
   stage: tag
@@ -60,8 +107,7 @@ tag:
   needs:
     - job: pre:tag
       artifacts: true
-    - job: docker:staging
-      optional: true
+    - docker:production
   before_script:
     - apk --cache-dir $APK_CACHE_DIR add git
     - git config --global user.name "$GITLAB_USER_NAME"
