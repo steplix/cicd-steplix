@@ -66,23 +66,20 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: generate-pr
-        id: open-pr
+        id: pr
         uses: repo-sync/pull-request@v2
         with:
           destination_branch: ${{ inputs.pr-branch }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Slack Notify
-        if: always()
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.slack-webhook }}
-          SLACK_CHANNEL: steplix-cli-notifications
-          SLACK_ICON: https://avatars.githubusercontent.com/u/51715007?s=400&u=7be97d4589b5283f98f92556df75269487efee3a&v=4
-          SLACK_TITLE: New Pull Request in repository "${{ github.repository }}"
-          SLACK_MESSAGE: ${{ steps.open-pr.outputs.pr_url }} 
-          SLACK_USERNAME: Slack Bot
-          SLACK_MSG_AUTHOR: ${{ github.actor }}
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_FOOTER: Triggered by Steplix actions
+        if: success()
         continue-on-error: true
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: pr
+          status: ${{ job.status }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}

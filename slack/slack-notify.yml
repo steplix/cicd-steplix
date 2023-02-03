@@ -5,18 +5,13 @@ on:
 
 jobs:
   notification:
+    if: always()
+    continue-on-error: true
     steps:
       - name: Slack Notify
-        if: always()
-        uses: rtCamp/action-slack-notify@v2
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: push
+          status: ${{ job.status }}
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: back-test-pipes
-          SLACK_ICON: https://avatars.githubusercontent.com/u/51715007?s=400&u=7be97d4589b5283f98f92556df75269487efee3a&v=4
-          SLACK_TITLE: example title
-          SLACK_MESSAGE: Example message
-          SLACK_USERNAME: Slack Bot
-          SLACK_MSG_AUTHOR: ${{ github.actor }}
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_FOOTER: Triggered by Steplix actions
-        continue-on-error: true
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
