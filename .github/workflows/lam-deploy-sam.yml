@@ -58,20 +58,6 @@ jobs:
       
       - name: deploy
         run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --config-env ${{ inputs.environment }} --parameter-overrides Environment=${{ inputs.environment }} ${{ secrets.variables }}
-      
-      - name: Slack Notify
-        if: failure()
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.slack-webhook }}
-          SLACK_CHANNEL: steplix-cli-notifications
-          SLACK_ICON: https://avatars.githubusercontent.com/u/51715007?s=400&u=7be97d4589b5283f98f92556df75269487efee3a&v=4
-          SLACK_TITLE: Error to deploy "${{ inputs.environment }}" in repository "${{ github.repository }}"
-          SLACK_USERNAME: Slack Bot
-          SLACK_MSG_AUTHOR: ${{ github.actor }}
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_FOOTER: Triggered by Steplix actions
-        continue-on-error: true
 
   generate-pr:
     needs: build-deploy
@@ -94,7 +80,7 @@ jobs:
           template: pr
           status: ${{ job.status }}
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_URL: ${{ secrets.slack-webhook }}
           PR_URL: ${{ steps.pr.outputs.pr_url }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
 
@@ -113,4 +99,4 @@ jobs:
           template: push
           status: ${{ job.status }}
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_URL: ${{ secrets.slack-webhook }}

@@ -80,6 +80,6 @@ jobs:
           template: pr
           status: ${{ job.status }}
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_URL: ${{ secrets.slack-webhook }}
           PR_URL: ${{ steps.pr.outputs.pr_url }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
