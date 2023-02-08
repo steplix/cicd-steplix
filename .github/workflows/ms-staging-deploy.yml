@@ -1,0 +1,168 @@
+name: Staging Deployment
+
+on:
+  workflow_call:
+    inputs:
+      COMMIT_MESSAGE:
+        type: string
+        description: "Pass the head commit message {{ github.event.head_commit.message }}"
+        required: true
+      AWS_ECR_REPOSITORY:
+        type: string
+        description: "AWS ECR Repository name"
+        required: true
+      AWS_CF_STACK_NAME:
+        type: string
+        default: '${{ github.event.repository.name }}'
+        description: "AWS cloud-formation stack name"
+        required: false
+      DISABLE_DEPLOY:
+        type: boolean
+        default: false
+        description: "Disable deploy to staging (only tag)"
+        required: false
+      PR_BRANCH:
+        type: string
+        default: master
+        description: Branch to generate PR to finish the pipeline
+        required: false
+      DISABLE_CACHE:
+        type: string
+        default: 'false'
+        description: Disable docker cache
+        required: false
+      SLACK_CHANNEL:
+        type: string
+        description: Slack channel to send notifications
+        required: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+      AWS_CLOUDFORMATION_PARAMS_OVERRIDE:
+        required: false
+
+env:
+  NEXT_BRANCH: '${{ inputs.PR_BRANCH }}'
+  COMMIT_MESSAGE: '${{ inputs.COMMIT_MESSAGE }}'
+  DISABLE_CACHE: '${{ inputs.DISABLE_CACHE }}'
+  AWS_ECR_REPOSITORY: '${{ inputs.AWS_ECR_REPOSITORY }}'
+  AWS_CF_STACK_NAME: '${{ inputs.AWS_CF_STACK_NAME }}'
+  SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
+
+  # Secrets
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
+  AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
+  AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+  AWS_REGION: '${{ secrets.AWS_REGION }}'
+  AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+run-name: >
+  Build new tag ${{ inputs.DISABLE_DEPLOY != true && '& staging deploy' }}: ${{ env.COMMIT_MESSAGE }}
+
+jobs:
+  pre-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: steplix/cicd-check-parameter@1.0.0
+        id: args
+        with:
+          param-0: major
+          param-1: minor
+          param-2: skip-staging-deploy
+
+      - uses: actions/checkout@v3
+      
+      - name: Get bumping mode
+        id: bump
+        run: echo "mode=${{ (steps.args.outputs.param-0 == 'true' && 'major') || (steps.args.outputs.param-1 == 'true' && 'minor') || 'patch' }}" >> $GITHUB_OUTPUT
+      
+      - name: Get tag
+        uses: zwaldowski/semver-release-action@v3
+        id: new-tag
+        with:
+          bump: ${{ steps.bump.outputs.mode }}
+          github_token: ${{ env.GITHUB_TOKEN }}
+          dry_run: true
+    outputs:
+      version: ${{ steps.new-tag.outputs.version }}
+      skip-deploy: ${{ steps.args.outputs.param-2 }}
+
+  deploy:
+    needs: pre-tag
+    if: env.DISABLE_DEPLOY != 'true' && needs.pre-tag.outputs.skip-deploy != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: steplix/cicd-steplix-deploy-ecr-and-cloudformation@v1
+        with:
+          ENVIRONMENT: ${{ github.env }}
+          COMMIT_MESSAGE: ${{ env.COMMIT_MESSAGE }}
+          AWS_ECR_REPOSITORY: ${{ env.AWS_ECR_REPOSITORY }}
+          AWS_CF_STACK_NAME: ${{ env.AWS_CF_STACK_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_CLOUDFORMATION_PARAMS_OVERRIDE: ${{ env.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}
+          DISABLE_CACHE: ${{ env.DISABLE_CACHE }}
+          TAG: ${{ needs.pre-tag.outputs.version }}
+
+  tag:
+    runs-on: ubuntu-latest
+    needs:
+      - pre-tag
+      - deploy
+    if: >
+      always() &&
+      (needs.deploy.result == 'skipped' || needs.deploy.result == 'success') &&
+      needs.pre-tag.result == 'success'
+    steps:
+      - uses: steplix/cicd-check-parameter@1.0.0
+        id: args
+        with:
+          param-0: major
+          param-1: minor
+
+      - uses: actions/checkout@v3
+      
+      - name: Get bumping mode
+        id: bump
+        run: echo "mode=${{ (steps.args.outputs.param-0 == 'true' && 'major') || (steps.args.outputs.param-1 == 'true' && 'minor') || 'patch' }}" >> $GITHUB_OUTPUT
+      
+      - name: Tagging
+        uses: zwaldowski/semver-release-action@v3
+        id: new-tag
+        with:
+          bump: ${{ steps.bump.outputs.mode }}
+          github_token: ${{ env.GITHUB_TOKEN }}
+
+      - name: Notify Slack of new available release
+        continue-on-error: true
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: release
+          status: ${{ job.status }}
+          channel: ${{ env.SLACK_CHANNEL }}
+        env:
+          NEW_TAG: ${{ steps.new-tag.outputs.version }}
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs:
+      - pre-tag
+      - deploy
+      - tag
+    if: failure()
+    continue-on-error: true
+    steps:
+      - name: Slack Notify
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: push
+          status: failure
+          channel: ${{ env.SLACK_CHANNEL }}

@@ -1,0 +1,116 @@
+name: Testing deployment
+
+on:
+  workflow_call:
+    inputs:
+      COMMIT_MESSAGE:
+        type: string
+        description: "Pass the head commit message {{ github.event.head_commit.message }}"
+        required: true
+      AWS_ECR_REPOSITORY:
+        type: string
+        description: "AWS ECR Repository name"
+        required: true
+      AWS_CF_STACK_NAME:
+        type: string
+        default: '${{ github.event.repository.name }}'
+        description: "AWS cloud-formation stack name"
+        required: false
+      PR_BRANCH:
+        type: string
+        default: master
+        description: Branch to generate PR to finish the pipeline
+        required: false
+      DISABLE_CACHE:
+        type: string
+        default: 'false'
+        description: Disable docker cache
+        required: false
+      SLACK_CHANNEL:
+        type: string
+        description: Slack channel to send notifications
+        required: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+      AWS_CLOUDFORMATION_PARAMS_OVERRIDE:
+        required: false
+
+env:
+  COMMIT_MESSAGE: '${{ inputs.COMMIT_MESSAGE }}'
+  NEXT_BRANCH: '${{ inputs.PR_BRANCH }}'
+  AWS_ECR_REPOSITORY: '${{ inputs.AWS_ECR_REPOSITORY }}'
+  AWS_CF_STACK_NAME: '${{ inputs.AWS_CF_STACK_NAME }}'
+  DISABLE_CACHE: '${{ inputs.DISABLE_CACHE }}'
+  SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
+
+  # Secrets
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
+  AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
+  AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+  AWS_REGION: '${{ secrets.AWS_REGION }}'
+  AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
+
+run-name: >
+  Testing deploy: ${{ env.COMMIT_MESSAGE }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: steplix/cicd-steplix-deploy-ecr-and-cloudformation@v1
+        with:
+          ENVIRONMENT: ${{ github.env }}
+          COMMIT_MESSAGE: ${{ env.COMMIT_MESSAGE }}
+          AWS_ECR_REPOSITORY: ${{ env.AWS_ECR_REPOSITORY }}
+          AWS_CF_STACK_NAME: ${{ env.AWS_CF_STACK_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_CLOUDFORMATION_PARAMS_OVERRIDE: ${{ env.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}
+          DISABLE_CACHE: ${{ env.DISABLE_CACHE }}
+
+  create-pr:
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create ${{ github.ref_name }} PullRequest
+        id: pr
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: "${{ env.NEXT_BRANCH }}"
+          pr_title: "${{ env.NEXT_BRANCH }} deployment: ${{ env.COMMIT_MESSAGE }}"
+          pr_body: Automated PR
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Slack
+        uses: steplix/cicd-notify@1.0.0
+        continue-on-error: true
+        with:
+          template: pr
+          status: ${{ job.status }}
+        env:
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs:
+      - deploy
+      - create-pr
+    if: failure()
+    continue-on-error: true
+    steps:
+      - name: Slack Notify
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: push
+          status: failure
