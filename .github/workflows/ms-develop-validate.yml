@@ -55,6 +55,7 @@ jobs:
       - uses: steplix/cicd-check-parameter@1.0.0
         id: args
         with:
+          message: ${{ env.COMMIT_MESSAGE }}
           param-0: no-cache
     
       - name: Cache dependencies
@@ -81,6 +82,7 @@ jobs:
       - uses: steplix/cicd-check-parameter@1.0.0
         id: args
         with:
+          message: ${{ env.COMMIT_MESSAGE }}
           param-0: automerge-testing
 
       - name: Create Testing Pull Request
