@@ -57,9 +57,6 @@ env:
   AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-run-name: >
-  Build new tag ${{ inputs.DISABLE_DEPLOY != true && '& staging deploy' }}: ${{ inputs.COMMIT_MESSAGE }}
-
 jobs:
   pre-tag:
     runs-on: ubuntu-latest
@@ -90,7 +87,7 @@ jobs:
 
   deploy:
     needs: pre-tag
-    if: env.DISABLE_DEPLOY != 'true' && needs.pre-tag.outputs.skip-deploy != 'true'
+    if: inputs.DISABLE_DEPLOY != 'true' && needs.pre-tag.outputs.skip-deploy != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: steplix/cicd-steplix-deploy-ecr-and-cloudformation@v1

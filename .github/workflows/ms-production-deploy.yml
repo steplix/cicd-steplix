@@ -50,9 +50,6 @@ env:
   AWS_REGION: '${{ secrets.AWS_REGION }}'
   AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
 
-run-name: >
-  Production deploy ${{ inputs.RELEASE_TAG }}
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
