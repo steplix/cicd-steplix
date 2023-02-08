@@ -46,7 +46,7 @@ env:
   COMMIT_MESSAGE: '${{ inputs.COMMIT_MESSAGE }}'
   NEXT_BRANCH: '${{ inputs.PR_BRANCH }}'
   AWS_ECR_REPOSITORY: '${{ inputs.AWS_ECR_REPOSITORY }}'
-  AWS_CF_STACK_NAME: '${{ inputs.AWS_CF_STACK_NAME }}'
+  AWS_CF_STACK_NAME: '${{ inputs.AWS_CF_STACK_NAME || github.event.repository.name }}'
   DISABLE_CACHE: '${{ inputs.DISABLE_CACHE }}'
   SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
 
