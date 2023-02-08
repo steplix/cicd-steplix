@@ -58,7 +58,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 run-name: >
-  Build new tag ${{ inputs.DISABLE_DEPLOY != true && '& staging deploy' }}: ${{ env.COMMIT_MESSAGE }}
+  Build new tag ${{ inputs.DISABLE_DEPLOY != true && '& staging deploy' }}: ${{ inputs.COMMIT_MESSAGE }}
 
 jobs:
   pre-tag:

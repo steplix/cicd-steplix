@@ -58,7 +58,7 @@ env:
   AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
 
 run-name: >
-  Testing deploy: ${{ env.COMMIT_MESSAGE }}
+  Testing deploy: ${{ inputs.COMMIT_MESSAGE }}
 
 jobs:
   deploy:

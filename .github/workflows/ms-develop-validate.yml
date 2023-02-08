@@ -41,7 +41,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 run-name: >
-  Develop validate: ${{ env.COMMIT_MESSAGE }}
+  Develop validate: ${{ inputs.COMMIT_MESSAGE }}
 
 jobs:
   validate:

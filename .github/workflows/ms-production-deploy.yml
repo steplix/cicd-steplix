@@ -51,7 +51,7 @@ env:
   AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
 
 run-name: >
-  Production deploy ${{ env.RELEASE_TAG }}
+  Production deploy ${{ inputs.RELEASE_TAG }}
 
 jobs:
   deploy:
