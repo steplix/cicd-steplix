@@ -17,8 +17,8 @@ on:
         description: "AWS cloud-formation stack name"
         required: false
       DISABLE_DEPLOY:
-        type: boolean
-        default: false
+        type: string
+        default: 'false'
         description: "Disable deploy to staging (only tag)"
         required: false
       DISABLE_CACHE:
