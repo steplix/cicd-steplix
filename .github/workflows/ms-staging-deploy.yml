@@ -21,11 +21,6 @@ on:
         default: false
         description: "Disable deploy to staging (only tag)"
         required: false
-      PR_BRANCH:
-        type: string
-        default: master
-        description: Branch to generate PR to finish the pipeline
-        required: false
       DISABLE_CACHE:
         type: string
         default: 'false'
@@ -48,7 +43,6 @@ on:
         required: false
 
 env:
-  NEXT_BRANCH: '${{ inputs.PR_BRANCH }}'
   COMMIT_MESSAGE: '${{ inputs.COMMIT_MESSAGE }}'
   DISABLE_CACHE: '${{ inputs.DISABLE_CACHE }}'
   AWS_ECR_REPOSITORY: '${{ inputs.AWS_ECR_REPOSITORY }}'
