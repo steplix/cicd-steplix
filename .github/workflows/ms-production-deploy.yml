@@ -53,10 +53,11 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: steplix/cicd-steplix-deploy-ecr-and-cloudformation@v1
         with:
-          ENVIRONMENT: ${{ github.env }}
+          ENVIRONMENT: production
           AWS_ECR_REPOSITORY: ${{ env.AWS_ECR_REPOSITORY }}
           AWS_CF_STACK_NAME: ${{ env.AWS_CF_STACK_NAME }}
           AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}

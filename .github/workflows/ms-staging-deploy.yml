@@ -89,10 +89,11 @@ jobs:
     needs: pre-tag
     if: inputs.DISABLE_DEPLOY != 'true' && needs.pre-tag.outputs.skip-deploy != 'true'
     runs-on: ubuntu-latest
+    environment: staging
     steps:
       - uses: steplix/cicd-steplix-deploy-ecr-and-cloudformation@v1
         with:
-          ENVIRONMENT: ${{ github.env }}
+          ENVIRONMENT: staging
           AWS_ECR_REPOSITORY: ${{ env.AWS_ECR_REPOSITORY }}
           AWS_CF_STACK_NAME: ${{ env.AWS_CF_STACK_NAME }}
           AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
