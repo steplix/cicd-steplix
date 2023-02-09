@@ -1,0 +1,25 @@
+name: 4. Production Deployment
+
+run-name: >
+  Production deploy ${{ github.event.release.tag_name }}
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  production:
+    uses: steplix/cicd-steplix/.github/workflows/ms-production-deploy.yml@main
+    with:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      DISABLE_CACHE: '${{ vars.DISABLE_DOCKER_CACHE }}'
+      AWS_ECR_REPOSITORY: '${{ vars.AWS_ECR_REPOSITORY }}'
+      AWS_CF_STACK_NAME: '${{ vars.AWS_CF_STACK_NAME }}'
+      SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+    secrets:
+      SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK }}'
+      AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
+      AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+      AWS_REGION: '${{ secrets.AWS_REGION }}'
+      AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'

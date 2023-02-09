@@ -1,0 +1,26 @@
+name: 2. Testing deployment
+
+run-name: >
+  Testing deploy: ${{ github.event.head_commit.message }}
+
+on:
+  push:
+    branches:
+      - testing
+
+jobs:
+  testing:
+    uses: steplix/cicd-steplix/.github/workflows/ms-testing-deploy.yml@main
+    with:
+      COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      PR_BRANCH: master
+      DISABLE_CACHE: '${{ vars.DISABLE_DOCKER_CACHE }}'
+      AWS_ECR_REPOSITORY: '${{ vars.AWS_ECR_REPOSITORY }}'
+      AWS_CF_STACK_NAME: '${{ vars.AWS_CF_STACK_NAME }}'
+      SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+    secrets:
+      SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK }}'
+      AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
+      AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+      AWS_REGION: '${{ secrets.AWS_REGION }}'
+      AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'

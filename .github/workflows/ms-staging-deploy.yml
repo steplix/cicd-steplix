@@ -104,7 +104,6 @@ jobs:
           TAG: ${{ needs.pre-tag.outputs.version }}
 
   tag:
-    permissions: write-all
     runs-on: ubuntu-latest
     needs:
       - pre-tag

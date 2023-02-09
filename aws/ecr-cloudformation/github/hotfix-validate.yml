@@ -1,0 +1,22 @@
+name: 2.b Hotfix validation
+
+run-name: >
+  Hotfix validate: ${{ github.event.head_commit.message }}
+
+on:
+  push:
+    branches:
+      - 'hotfix/**'
+
+jobs:
+  develop:
+    uses: steplix/cicd-steplix/.github/workflows/ms-hotfix-validate.yml@main
+    with:
+      COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      NODE_VERSION: '${{ vars.NODE_VERSION }}'
+      DISABLE_CACHE: '${{ vars.DISABLE_NODE_CACHE }}'
+      SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+      MAIN_BRANCH: master
+      DEVELOP_BRANCH: develop
+    secrets:
+      SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK }}'
