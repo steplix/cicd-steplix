@@ -10,7 +10,7 @@ on:
 
 jobs:
   testing:
-    uses: ./.github/workflows/web-s3-validate.yml
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-validate.yml@main
     with:
       node-version: ${{ vars.NODE_VERSION }}
 
@@ -28,7 +28,7 @@ jobs:
 
   generate-pr:
     needs: [build]
-    uses: ./.github/workflows/web-s3-generate-pr.yml
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-generate-pr.yml@main
     with:
       destination-branch-name: ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}
       pr-title: "Pushing develop into ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}"

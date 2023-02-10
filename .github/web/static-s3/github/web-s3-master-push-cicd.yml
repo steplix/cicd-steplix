@@ -12,7 +12,7 @@ jobs:
 
   tagging:
     if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/web-s3-create-tag.yml
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-create-tag.yml@main
     with:
       text-where-search-for-parameters: ${{ github.event.pull_request.title }}
 
