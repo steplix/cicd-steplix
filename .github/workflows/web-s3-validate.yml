@@ -1,0 +1,26 @@
+name: Test
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node version to use'
+        type: string
+        default: 14.18.0
+        required: false
+
+jobs:
+
+  ### Running the Test
+
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run test --if-present
+      - run: echo "TEST SUCCESSFULLY"

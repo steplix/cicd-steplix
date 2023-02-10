@@ -1,0 +1,38 @@
+name: generate pr
+
+on:
+  workflow_call:
+    inputs:
+      origin-branch-name:
+        type: string
+        description: "Name of the branch of origin from which the pr starts. If blank, default: triggered branch"
+        default: ""
+        required: false
+      destination-branch-name:
+        type: string
+        description: "Destination branch name for the pr"
+        required: true
+      pr-title:
+        type: string
+        description: "Title for the pr"
+        default: "An automated PR"
+        required: false
+
+
+
+jobs:
+
+  ### Generating PR
+
+  generate-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: generate-pr
+        id: open-pr
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: ${{ inputs.origin-branch-name }}
+          destination_branch: ${{ inputs.destination-branch-name }}
+          pr_title: ${{ inputs.pr-title }}
+      - run: echo "PR GENERATED SUCCESSFULLY"

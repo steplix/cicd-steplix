@@ -1,0 +1,46 @@
+name: Push in development branch
+run-name: >
+  "Create PR FROM develop TO ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}: ${{ github.event.head_commit.message }}"
+
+on:
+  push:
+    branches:
+      - develop
+
+
+jobs:
+  testing:
+    uses: ./.github/workflows/web-s3-validate.yml
+    with:
+      node-version: ${{ vars.NODE_VERSION }}
+
+  build:
+    needs: [ testing ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ vars.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run release
+
+
+  generate-pr:
+    needs: [build]
+    uses: ./.github/workflows/web-s3-generate-pr.yml
+    with:
+      destination-branch-name: ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}
+      pr-title: "Pushing develop into ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}"
+
+  notify:
+    if: ${{ always() }}
+    needs: [testing, build, generate-pr]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: steplix/cicd-notify@0.0.17
+        with:
+          template: 'push'
+          status: ${{ needs.testing.result || needs.build.result || needs.generate-pr.result }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
