@@ -35,7 +35,7 @@ jobs:
 
   generate-pr:
     needs: build_deploy
-    uses: ./.github/workflows/web-s3-generate-pr.yml
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-generate-pr.yml@main
     with:
       destination-branch-name: ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}
       pr-title: "<patch> is TAG VERSION INCREMENT: PUSHING testing INTO ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}"
