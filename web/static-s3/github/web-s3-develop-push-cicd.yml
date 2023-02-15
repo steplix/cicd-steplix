@@ -7,40 +7,20 @@ on:
     branches:
       - develop
 
+env:
+  NODE_VERSION: ${{ vars.NODE_VERSION }}
+  DESTINATION_PR: ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}
+  PR_TITLE: "Pushing develop into ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}"
+  SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
 
 jobs:
-  testing:
-    uses: steplix/cicd-steplix/.github/workflows/web-s3-validate.yml@main
+
+  develop:
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-develop-push.yml@feature/addStaticWebWorkflows
     with:
-      node-version: ${{ vars.NODE_VERSION }}
-
-  build:
-    needs: [ testing ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ vars.NODE_VERSION }}
-      - run: npm ci
-      - run: npm run release
-
-
-  generate-pr:
-    needs: [build]
-    uses: steplix/cicd-steplix/.github/workflows/web-s3-generate-pr.yml@main
-    with:
-      destination-branch-name: ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}
-      pr-title: "Pushing develop into ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}"
-
-  notify:
-    if: ${{ always() }}
-    needs: [testing, build, generate-pr]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify Slack
-        uses: steplix/cicd-notify@0.0.17
-        with:
-          template: 'push'
-          status: ${{ needs.testing.result || needs.build.result || needs.generate-pr.result }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      NODE_VERSION: ${{ env.NODE_VERSION }}
+      DESTINATION_PR: ${{ env.DESTINATION_PR }}
+      PR_TITLE: ${{ env.PR_TITLE }}
+      SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
