@@ -1,0 +1,19 @@
+name: 1. Publish package
+
+run-name: >
+  Publish package: ${{ github.event.head_commit.message }}
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  master:
+    uses: steplix/cicd-steplix/.github/workflows/pkg-publish.yml@main
+    with:
+      NODE_VERSION: '${{ vars.NODE_VERSION }}'
+      SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+    secrets:
+      SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK }}'
+      NPM_TOKEN: '${{ secrets.NPM_TOKEN }}'

@@ -1,0 +1,21 @@
+name: 1. Development validation
+
+run-name: >
+  Develop validate: ${{ github.event.head_commit.message }}
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  develop:
+    uses: steplix/cicd-steplix/.github/workflows/pkg-develop-validate.yml@main
+    with:
+      COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      PR_BRANCH: master
+      NODE_VERSION: '${{ vars.NODE_VERSION }}'
+      DISABLE_CACHE: '${{ vars.DISABLE_NODE_CACHE }}'
+      SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+    secrets:
+      SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK }}'
