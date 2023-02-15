@@ -1,0 +1,99 @@
+name: Push in master branch
+run-name: >
+  ${{ github.event.pull_request.title }}
+
+on:
+  workflow_call:
+    inputs:
+      NODE_VERSION:
+        description: 'Node version to use'
+        type: string
+        default: 14.18.0
+        required: false
+      SLACK_CHANNEL:
+        type: string
+        description: Slack channel to send notifications
+        required: false
+      AWS_BUCKET:
+        type: string
+        description: Bucket S3 to copy files for deploy
+        required: true
+      TEXT-WHERE-SEARCH-FOR-PARAMETERS:
+        type: string
+        description: 'Message to parse. Defaults to head commit message'
+        required: false
+        default: ${{ github.event.head_commit.message }}
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+      AWS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+
+
+jobs:
+
+  tagging:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.bumped_tag.outputs.version }}
+    steps:
+      - uses: steplix/cicd-check-parameter@1.0.0
+        id: args
+        with:
+          message: ${{ inputs.TEXT-WHERE-SEARCH-FOR-PARAMETERS}}
+          param-0: major
+          param-1: minor
+
+      - name: Get bumping mode
+        id: bump-mode
+        run: echo "mode=${{ (steps.args.outputs.param-0 == 'true' && 'major') || (steps.args.outputs.param-1 == 'true' && 'minor') || 'patch' }}" >> $GITHUB_OUTPUT
+
+      # Bump tag without affecting repository
+      - uses: zwaldowski/semver-release-action@v3
+        name: Get bumped tag
+        id: bumped_tag
+        with:
+          bump: ${{ steps.bump-mode.outputs.mode }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-zip-upload:
+    needs: [ tagging ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run release
+      #ZIP
+      - name: generate-zip
+        id: zip
+        run: cd out && tar -czvf ${{ needs.tagging.outputs.tag }}.tar.gz *
+
+      #UPLOAD
+      - uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: copy files to S3
+        run: |
+          aws s3 cp out/${{ needs.tagging.outputs.tag }}.tar.gz s3://${{ inputs.AWS_BUCKET }}/${{ needs.tagging.outputs.tag }}.tar.gz
+
+
+  notify:
+    if: ${{ always() }}
+    needs: [ tagging,build-zip-upload ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: steplix/cicd-notify@0.0.17
+        with:
+          template: 'push'
+          status: ${{ needs.tagging.result || needs.build-zip-upload.result }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}

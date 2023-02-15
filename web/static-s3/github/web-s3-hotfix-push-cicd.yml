@@ -7,47 +7,20 @@ on:
     branches:
       - 'hotfix/**'
 
+env:
+  NODE_VERSION: ${{ vars.NODE_VERSION }}
+  DESTINATION_PR_MASTER: ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}
+  DESTINATION_PR_DEVELOP: develop
+  SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
 
 jobs:
 
-  testing:
-    uses: steplix/cicd-steplix/.github/workflows/web-s3-validate.yml@main
+  hotfix:
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-develop-push.yml@feature/addStaticWebWorkflows
     with:
-      node-version: ${{ vars.NODE_VERSION }}
-
-  build:
-    needs: [ testing ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ vars.NODE_VERSION }}
-      - run: npm ci
-      - run: npm run release
-
-  generate-pr-to-master:
-    needs: [testing,build]
-    uses: steplix/cicd-steplix/.github/workflows/web-s3-generate-pr.yml@main
-    with:
-      destination-branch-name: ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}
-      pr-title: "<patch> is TAG VERSION INCREMENT: Pushing HOTFIX ${{ github.ref_name }} into Master"
-
-  generate-pr-to-develop:
-    needs: [testing,build]
-    uses: steplix/cicd-steplix/.github/workflows/web-s3-generate-pr.yml@main
-    with:
-      destination-branch-name: ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}
-      pr-title: "Pushing HOTFIX ${{ github.ref_name }} into Develop"
-
-  notify:
-    if: ${{ always() }}
-    needs: [ testing,build,generate-pr-to-master,generate-pr-to-develop ]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify Slack
-        uses: steplix/cicd-notify@0.0.17
-        with:
-          template: 'push'
-          status: ${{ needs.testing.result || needs.build.result || needs.generate-pr-to-master.result || needs.generate-pr-to-develop.result }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      NODE_VERSION: ${{ env.NODE_VERSION }}
+      DESTINATION_PR_MASTER: ${{ env.DESTINATION_PR_MASTER }}
+      DESTINATION_PR_DEVELOP: ${{ env.DESTINATION_PR_DEVELOP }}
+      SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

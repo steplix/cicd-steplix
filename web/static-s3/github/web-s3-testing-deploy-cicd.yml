@@ -6,48 +6,25 @@ on:
     branches:
       - testing
 
+env:
+  NODE_VERSION: ${{ vars.NODE_VERSION }}
+  DESTINATION_PR: ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}
+  PR_TITLE: "<patch> is TAG VERSION INCREMENT: PUSHING testing INTO ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}"
+  SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
+  AWS_BUCKET: ${{ vars.TEST_AWS_BUCKET }}
 
 jobs:
 
-  build_deploy:
-    runs-on: ubuntu-latest
-    steps:
-      #BUILD
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ vars.NODE_VERSION }}
-      - run: npm ci
-      - run: npm run release
-      #UPLOAD
-      - uses: aws-actions/configure-aws-credentials@v1.7.0
-        with:
-          aws-access-key-id: ${{ secrets.TEST_AWS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.TEST_AWS_REGION }}
-      - name: copy files to S3
-        run: |
-          aws s3 sync out s3://${{ vars.TEST_AWS_BUCKET }}
-      - name: Cloudfront invalidation
-        run: |
-          aws cloudfront create-invalidation --distribution-id ${{ vars.TEST_AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
-        
-
-  generate-pr:
-    needs: build_deploy
-    uses: steplix/cicd-steplix/.github/workflows/web-s3-generate-pr.yml@main
+  testing:
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-testing-deploy.yml@feature/addStaticWebWorkflows
     with:
-      destination-branch-name: ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}
-      pr-title: "<patch> is TAG VERSION INCREMENT: PUSHING testing INTO ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}"
-
-  notify:
-    if: ${{ always() }}
-    needs: [ build_deploy,generate-pr ]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify Slack
-        uses: steplix/cicd-notify@0.0.17
-        with:
-          template: 'push'
-          status: ${{ needs.build_deploy.result || needs.generate-pr.result }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      NODE_VERSION: ${{ env.NODE_VERSION }}
+      DESTINATION_PR: ${{ env.DESTINATION_PR }}
+      PR_TITLE: ${{ env.PR_TITLE }}
+      SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      AWS_KEY_ID: ${{ secrets.TEST_AWS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.TEST_AWS_REGION }}
+      AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.TEST_AWS_CLOUDFRONT_DISTRIBUTION_ID }}

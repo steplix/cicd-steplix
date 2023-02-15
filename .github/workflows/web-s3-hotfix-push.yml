@@ -1,0 +1,85 @@
+name: Push Hotfix in master branch
+run-name: >
+  Push: ${{ github.ref_name }}
+
+on:
+  workflow_call:
+    inputs:
+      NODE_VERSION:
+        description: 'Node version to use'
+        type: string
+        default: 14.18.0
+        required: false
+      DESTINATION_PR_MASTER:
+        description: 'Branch to target MR'
+        type: string
+        default: master
+        required: false
+      DESTINATION_PR_DEVELOP:
+        description: 'Branch to target MR'
+        type: string
+        default: develop
+        required: false
+      SLACK_CHANNEL:
+        type: string
+        description: Slack channel to send notifications
+        required: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+
+  testing:
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-validate.yml@main
+    with:
+      node-version: ${{ inputs.NODE_VERSION }}
+
+  build:
+    needs: [ testing ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run release
+
+  generate-pr-to-master:
+    needs: [testing,build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: generate-pr
+        id: open-pr
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: ${{ inputs.DESTINATION_PR_MASTER }}
+          pr_title: "<patch> is TAG VERSION INCREMENT: Pushing HOTFIX ${{ github.ref_name }} into ${{ inputs.DESTINATION_PR_MASTER }}"
+      - run: echo "PR GENERATED SUCCESSFULLY"
+
+  generate-pr-to-develop:
+    needs: [testing,build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: generate-pr
+        id: open-pr
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: ${{ inputs.DESTINATION_PR_DEVELOP }}
+          pr-title: "Pushing HOTFIX ${{ github.ref_name }} into ${{ inputs.DESTINATION_PR_DEVELOP }}"
+
+  notify:
+    if: ${{ always() }}
+    needs: [ testing,build,generate-pr-to-master,generate-pr-to-develop ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: 'push'
+          status: ${{ needs.testing.result || needs.build.result || needs.generate-pr-to-master.result || needs.generate-pr-to-develop.result }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          channel: ${{ inputs.SLACK_CHANNEL }}
