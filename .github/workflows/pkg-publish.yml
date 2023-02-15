@@ -95,7 +95,7 @@ jobs:
         id: new-tag
         with:
           bump: ${{ steps.bump.outputs.mode }}
-          github_token: ${{ env.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   notify-failure:
     runs-on: ubuntu-latest
