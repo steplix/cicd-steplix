@@ -68,7 +68,7 @@ jobs:
         run: |
           sed -i'' 's/"version": "[0-9]*\.[0-9]*\.[0-9]*"/"version": "${{ needs.pre-tag.outputs.version }}"/g' package.json
 
-      - run: npm publish --access public --tag ${{ needs.pre-tag.outputs.version }}
+      - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
 
