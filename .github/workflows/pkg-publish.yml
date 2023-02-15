@@ -66,7 +66,7 @@ jobs:
       - name: Modify package.json based on bumped tag
         shell: bash
         run: |
-          echo sed -i 's/\"version\":\s*\"[0-9]+\.[0-9]+\.[0-9]+\",\"version\": \"${{ needs.pre-tag.outputs.version }}\"/g' package.json
+          sed -i'' 's/"version": "[0-9]*\.[0-9]*\.[0-9]*"/"version": "${{ needs.pre-tag.outputs.version }}"/g' package.json
 
       - run: npm publish
         env:
