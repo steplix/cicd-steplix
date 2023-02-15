@@ -1,0 +1,93 @@
+name: Push in testing branch
+run-name: >
+  "Deploying testing and creating PR to ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}"
+
+on:
+  workflow_call:
+    inputs:
+      NODE_VERSION:
+        description: 'Node version to use'
+        type: string
+        default: 14.18.0
+        required: false
+      DESTINATION_PR:
+        description: 'Branch to target MR'
+        type: string
+        default: master
+        required: false
+      PR_TITLE:
+        type: string
+        description: "Title for the pr"
+        default: "Pushing testing"
+        required: false
+      SLACK_CHANNEL:
+        type: string
+        description: Slack channel to send notifications
+        required: false
+      AWS_BUCKET:
+        type: string
+        description: Bucket S3 to copy files for deploy
+        required: true
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+      AWS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+      AWS_CLOUDFRONT_DISTRIBUTION_ID:
+        required: true
+
+jobs:
+
+  build_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      #BUILD
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run release
+      #UPLOAD
+      - uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: copy files to S3
+        run: |
+          aws s3 sync out s3://${{ inputs.AWS_BUCKET }}
+      - name: Cloudfront invalidation
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ inputs.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+  
+
+  generate-pr:
+    needs: [ build_deploy ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: generate-pr
+        id: open-pr
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: ${{ inputs.DESTINATION_PR }}
+          pr_title: ${{ inputs.PR_TITLE }}
+      - run: echo "PR GENERATED SUCCESSFULLY"
+
+  notify:
+    if: ${{ always() }}
+    needs: [ build_deploy,generate-pr ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: 'push'
+          status: ${{ needs.build_deploy.result || needs.generate-pr.result }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          channel: ${{ inputs.SLACK_CHANNEL }}
