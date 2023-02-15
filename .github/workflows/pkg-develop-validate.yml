@@ -14,7 +14,7 @@ on:
         required: false
       NODE_VERSION:
         type: string
-        default: '18'
+        default: '18.x'
         required: false
       DISABLE_CACHE:
         type: string
@@ -35,7 +35,7 @@ env:
   NODE_VERSION: '${{ inputs.NODE_VERSION }}'
   DISABLE_CACHE: '${{ inputs.DISABLE_CACHE }}'
   SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
-  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK }}'
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
 
 jobs:
   validate:
