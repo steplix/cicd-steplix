@@ -5,7 +5,7 @@ on:
     inputs:
       NODE_VERSION:
         type: string
-        default: '18'
+        default: '18.x'
         required: false
       SLACK_CHANNEL:
         type: string
@@ -18,10 +18,10 @@ on:
         required: true
 
 env:
+  NODE_VERSION: '${{ inputs.NODE_VERSION }}'
+  SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
   NPM_TOKEN: '${{ secrets.NPM_TOKEN }}'
-  NODE_VERSION: '${{ vars.NODE_VERSION }}'
-  SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
-  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK }}'
 
 jobs:
   pre-tag:

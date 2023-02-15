@@ -1,4 +1,4 @@
-name: 1. Publish package
+name: 2. Publish package
 
 run-name: >
   Publish package: ${{ github.event.head_commit.message }}
