@@ -1,0 +1,114 @@
+name: Publish package
+
+on:
+  workflow_call:
+    inputs:
+      NODE_VERSION:
+        type: string
+        default: '18'
+        required: false
+      SLACK_CHANNEL:
+        type: string
+        description: Slack channel to send notifications
+        required: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+      NPM_TOKEN:
+        required: true
+
+env:
+  NPM_TOKEN: '${{ secrets.NPM_TOKEN }}'
+  NODE_VERSION: '${{ vars.NODE_VERSION }}'
+  SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK }}'
+
+jobs:
+  pre-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: steplix/cicd-check-parameter@1.0.0
+        id: args
+        with:
+          param-0: major
+          param-1: minor
+
+      - uses: actions/checkout@v3
+      
+      - name: Get bumping mode
+        id: bump
+        run: echo "mode=${{ (steps.args.outputs.param-0 == 'true' && 'major') || (steps.args.outputs.param-1 == 'true' && 'minor') || 'patch' }}" >> $GITHUB_OUTPUT
+      
+      - name: Get tag
+        uses: zwaldowski/semver-release-action@v3
+        id: new-tag
+        with:
+          bump: ${{ steps.bump.outputs.mode }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          dry_run: true
+    outputs:
+      version: ${{ steps.new-tag.outputs.version }}
+      skip-deploy: ${{ steps.args.outputs.param-2 }}
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: pre-tag
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+      
+      - run: npm ci --ignore-scripts
+
+      - name: Modify package.json based on bumped tag
+        shell: bash
+        run: |
+          echo sed -i 's/\"version\":\s*\"[0-9]+\.[0-9]+\.[0-9]+\",\"version\": \"${{ needs.pre-tag.outputs.version }}\"/g' package.json
+
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
+
+  tag:
+    runs-on: ubuntu-latest
+    needs:
+      - pre-tag
+      - publish
+    steps:
+      - uses: steplix/cicd-check-parameter@1.0.0
+        id: args
+        with:
+          param-0: major
+          param-1: minor
+
+      - uses: actions/checkout@v3
+      
+      - name: Get bumping mode
+        id: bump
+        run: echo "mode=${{ (steps.args.outputs.param-0 == 'true' && 'major') || (steps.args.outputs.param-1 == 'true' && 'minor') || 'patch' }}" >> $GITHUB_OUTPUT
+      
+      - name: Tagging
+        uses: zwaldowski/semver-release-action@v3
+        id: new-tag
+        with:
+          bump: ${{ steps.bump.outputs.mode }}
+          github_token: ${{ env.GITHUB_TOKEN }}
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs:
+      - pre-tag
+      - publish
+      - tag
+    if: failure()
+    continue-on-error: true
+    steps:
+      - name: Slack Notify
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: push
+          status: failure
+          channel: ${{ env.SLACK_CHANNEL }}

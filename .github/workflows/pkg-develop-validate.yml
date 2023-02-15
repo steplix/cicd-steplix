@@ -30,15 +30,12 @@ on:
         required: true
 
 env:
-  NEXT_BRANCH: '${{ inputs.PR_BRANCH }}'
   COMMIT_MESSAGE: '${{ inputs.COMMIT_MESSAGE }}'
+  PR_BRANCH: '${{ inputs.PR_BRANCH }}'
   NODE_VERSION: '${{ inputs.NODE_VERSION }}'
   DISABLE_CACHE: '${{ inputs.DISABLE_CACHE }}'
   SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
-
-  # Secrets
-  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK }}'
 
 jobs:
   validate:
@@ -48,15 +45,9 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
-    
-      - uses: steplix/cicd-check-parameter@1.0.0
-        id: args
-        with:
-          message: ${{ env.COMMIT_MESSAGE }}
-          param-0: no-cache
-    
+
       - name: Cache dependencies
-        if: steps.args.outputs.param-0 != 'true' && env.DISABLE_CACHE != 'true'
+        if: env.DISABLE_CACHE != 'true'
         id: cache
         uses: actions/cache@v3
         with:
@@ -67,6 +58,7 @@ jobs:
         if: (steps.cache.outputs.cache-hit != 'true')
         run: npm ci --ignore-scripts
     
+      - run: npm run build --if-present
       - run: npm run lint --if-present
       - run: npm run test --if-present
 
@@ -76,14 +68,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Create Testing Pull Request
+      - name: Create Pull Request
         id: pr
         uses: repo-sync/pull-request@v2
         with:
-          destination_branch: "${{ env.NEXT_BRANCH }}"
-          pr_title: "Testing deployment: ${{ env.COMMIT_MESSAGE }}"
+          destination_branch: ${{ env.PR_BRANCH }}
+          pr_title: "Publish package: ${{ env.COMMIT_MESSAGE }}"
           pr_body: Automated PR
-          github_token: ${{ env.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Notify Slack
         uses: steplix/cicd-notify@1.0.0
