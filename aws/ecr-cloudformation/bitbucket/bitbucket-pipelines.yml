@@ -1,0 +1,239 @@
+#  NodeJs ECR Docker Cloudformation deploy
+
+options:
+  max-time: 20
+
+pipelines:
+  custom:
+    # Always has to be master branch
+    production-deployment:
+      - variables:
+          - name: DeployTag
+            default: "latest"
+      - stage:
+          name: Deploy to production
+          deployment: production
+          steps:
+            - step:
+                name: Deploy tag to AWS CloudFormation
+                image: alpine:3.17.3
+                script:
+                  - apk add bash jq git aws-cli
+                  - git fetch --tags
+                  - >
+                    if [ $DeployTag == "latest" ]; then
+                      echo "Deploying latest tag"
+                      TAG_ID=$(git rev-list --tags --max-count=1)
+                      TAG=$(if [ -z "$TAG_ID" ]; then echo "0.0.0"; else echo $(git describe --tags ${TAG_ID}); fi)
+                    else
+                      if [ $(git tag -l "$DeployTag") ]; then
+                        TAG=$DeployTag
+                      else
+                        echo "Tag $DeployTag does not exist"
+                        exit 1
+                      fi
+                    fi
+                  - echo "Deploying $TAG"                  
+                  - STACK_NAME=${ENV_AWS_ECS_NAME:-$BITBUCKET_REPO_SLUG}-production
+
+                  - PARAMS_OVERRIDE=($(echo "$AWS_CLOUDFORMATION_PARAMS_OVERRIDE" | tr ' ' '\n'))
+                  - JSON_PARAMS_OVERRIDE=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/ssp-to-json.sh' | bash -s Environment=production ParameterSuffix=Production EnvAwsECRImage=${AWS_ECR_REPOSITORY}:${TAG} ${PARAMS_OVERRIDE[@]})
+
+                  - pipe: atlassian/aws-cloudformation-deploy:0.15.2
+                    variables:
+                      STACK_NAME: $STACK_NAME
+                      TEMPLATE: './cloudformation/cloudformation.yml'
+                      
+                      STACK_PARAMETERS: $JSON_PARAMS_OVERRIDE
+
+                      WITH_DEFAULT_TAGS: 'false'
+
+                      WAIT: 'true'
+                      WAIT_INTERVAL: 10
+                      DEBUG: 'true'
+  branches:
+    develop:
+      - step:
+          image: node:12
+          name: Build and Test
+          caches:
+            - node
+          script:
+            - npm install
+            - npm run lint --if-present
+            - npm run test --if-present
+      - step:
+          name: Create Testing MR
+          image: alpine:3.17.3
+          script:
+            - apk add curl bash jq git
+            - HEAD_COMMIT_MESSAGE=$(git log --format=%B -n 1)
+            - echo $HEAD_COMMIT_MESSAGE
+          
+            - git checkout -b develop-testing
+            - git merge develop
+            - git push origin 
+            - TESTING_MR_ID=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/create-mr.sh' | bash -s testing develop-testing)
+            - > 
+              echo "${HEAD_COMMIT_MESSAGE}" | grep -q "#automerge-testing" && echo "trigger automerge" && wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/merge-mr.sh' | bash -s $TESTING_MR_ID
+
+    hotfix/*:
+      - step:
+          image: node:12
+          name: Build and Test
+          caches:
+            - node
+          script:
+            - npm install
+            - npm run lint --if-present
+            - npm test --if-present
+      - step:
+          name: Create Master MR
+          image: alpine:3.17.3
+          script:
+            - apk add curl bash jq git
+            - HEAD_COMMIT_MESSAGE=$(git log --format=%B -n 1)
+
+            - DEVELOP_MR_ID=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/create-mr.sh' | bash -s develop)
+            - MASTER_MR_ID=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/create-mr.sh' | bash -s master)
+            - echo "${HEAD_COMMIT_MESSAGE}" | grep -q "#automerge-master" && echo "trigger automerge master" && wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/merge-mr.sh' | bash -s $MASTER_MR_ID
+            - echo "${HEAD_COMMIT_MESSAGE}" | grep -q "#automerge-develop" && echo "trigger automerge develop" && wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/merge-mr.sh' | bash -s $DEVELOP_MR_ID
+
+    testing:
+      - stage:
+          name: Deploy to testing
+          deployment: testing
+          steps:
+            - step:
+                name: Build docker; push to ECR
+                image: amazon/aws-cli:2.11.8
+                services:
+                  - docker
+                script:
+                  # Installing and running awscli for docker build because of registry caches
+                  - export DOCKER_BUILDKIT=1
+
+                  - REGISTRY_ACCOUNT_ID=${ECR_ACCOUNT_ID:-$AWS_ACCOUNT_ID}
+                  - REGISTRY_REGION=${ECR_DEFAULT_REGION:-$AWS_DEFAULT_REGION}
+
+                  - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+                  - DOCKER_URL=$REGISTRY_ACCOUNT_ID.dkr.ecr.$REGISTRY_REGION.amazonaws.com/${AWS_ECR_REPOSITORY}
+
+                  - TAG="${BITBUCKET_COMMIT}"
+                  
+                  # Commenting to avoid minute usage
+
+                  - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin ${DOCKER_URL}
+                  - LATEST=$(aws ecr describe-images --repository-name ${AWS_ECR_REPOSITORY} --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' --output text)
+                  
+                  # # https://github.com/moby/buildkit/issues/2274#issuecomment-1378849271
+                  # - docker pull ${DOCKER_URL}:${BITBUCKET_COMMIT} || true
+
+                  # Replace tag in package.json version
+                  - |
+                    sed -i "s/\"version\":\s*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"$TAG\"/g" package.json
+
+                  - docker build --cache-from=${DOCKER_URL}:${LATEST} --tag ${DOCKER_URL}:${TAG} --build-arg BUILDKIT_INLINE_CACHE=1 .
+                  - docker push ${DOCKER_URL}:${TAG}
+            - step:
+                name: Deploy AWS CloudFormation
+                script:
+                  - echo $DEPL
+                  - STACK_NAME=${ENV_AWS_ECS_NAME:-$BITBUCKET_REPO_SLUG}-testing
+                  
+                  # Commenting to avoid minute usage                  
+                  - PARAMS_OVERRIDE=($(echo "$AWS_CLOUDFORMATION_PARAMS_OVERRIDE" | tr ' ' '\n'))
+                  - JSON_PARAMS_OVERRIDE=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/ssp-to-json.sh' | bash -s Environment=testing ParameterSuffix=Testing EnvAwsECRImage=${AWS_ECR_REPOSITORY}:${BITBUCKET_COMMIT} ${PARAMS_OVERRIDE[@]})
+                  
+                  - echo $PARAMS_OVERRIDE
+                  - echo $JSON_PARAMS_OVERRIDE
+
+                  - pipe: atlassian/aws-cloudformation-deploy:0.15.2
+                    variables:
+                      STACK_NAME: $STACK_NAME
+                      TEMPLATE: './cloudformation/cloudformation.yml'
+                      STACK_PARAMETERS: $JSON_PARAMS_OVERRIDE
+                      WITH_DEFAULT_TAGS: 'false'
+                      
+                      WAIT: 'true'
+                      WAIT_INTERVAL: 10
+                      
+                      DEBUG: 'true'
+      - step:
+          image: alpine:3.17.3
+          name: Create Master MR
+          script:
+            - apk add curl bash jq git
+            - MASTER_MR_ID=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/create-mr.sh' | bash -s master)
+            - echo "${HEAD_COMMIT_MESSAGE}" | grep -q "#automerge-master" && echo "trigger automerge" && wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/merge-mr.sh' | bash -s $MASTER_MR_ID
+
+    master:
+      - stage:
+          name: Deploy to staging
+          deployment: staging
+          steps:
+            - step:
+                name: Build tagged docker; push to ECR
+                image: alpine:3.17.3
+                services:
+                  - docker
+                script:
+                  - apk add bash jq git aws-cli
+                  - TAG=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/get-new-tag.sh' | bash -s)
+                  - echo $TAG
+                  
+                  # Installing and running awscli for docker build because of registry caches
+                  - export DOCKER_BUILDKIT=1
+
+                  - REGISTRY_ACCOUNT_ID=${ECR_ACCOUNT_ID:-$AWS_ACCOUNT_ID}
+                  - REGISTRY_REGION=${ECR_DEFAULT_REGION:-$AWS_DEFAULT_REGION}
+
+                  - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+                  - DOCKER_URL=$REGISTRY_ACCOUNT_ID.dkr.ecr.$REGISTRY_REGION.amazonaws.com/${AWS_ECR_REPOSITORY}
+
+                  
+                  - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin ${DOCKER_URL}
+                  - LATEST=$(aws ecr describe-images --repository-name ${AWS_ECR_REPOSITORY} --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' --output text)
+                  
+                  - |
+                    sed -i "s/\"version\":\s*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"$TAG\"/g" package.json
+
+                  - docker build --cache-from=${DOCKER_URL}:${LATEST} --tag ${DOCKER_URL}:${TAG} --build-arg BUILDKIT_INLINE_CACHE=1 .
+                  - docker push ${DOCKER_URL}:${TAG}    
+            - step:
+                name: Deploy AWS CloudFormation
+                image: alpine:3.17.3
+                script:
+                  - apk add bash jq git aws-cli
+                  - TAG=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/get-new-tag.sh' | bash -s )
+                  - echo $TAG
+                  
+                  - STACK_NAME=${ENV_AWS_ECS_NAME:-$BITBUCKET_REPO_SLUG}-staging
+                  - echo $STACK_NAME
+                  # - read -a PARAMS_OVERRIDE <<< "$AWS_CLOUDFORMATION_PARAMS_OVERRIDE"
+                  - PRE_TEST=$(echo "$AWS_CLOUDFORMATION_PARAMS_OVERRIDE" | tr ' ' '\n')
+                  # - PARAMS_OVERRIDE=($(echo "$AWS_CLOUDFORMATION_PARAMS_OVERRIDE" | tr ' ' '\n'))
+                  - echo $PARAMS_OVERRIDE
+                  - JSON_PARAMS_OVERRIDE=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/ssp-to-json.sh' | bash -s Environment=staging ParameterSuffix=Staging EnvAwsECRImage=${AWS_ECR_REPOSITORY}:${TAG} ${AWS_CLOUDFORMATION_PARAMS_OVERRIDE})
+                  - echo $JSON_PARAMS_OVERRIDE
+
+                  - pipe: atlassian/aws-cloudformation-deploy:0.15.2
+                    variables:
+                      STACK_NAME: $STACK_NAME
+                      TEMPLATE: './cloudformation/cloudformation.yml'
+                      STACK_PARAMETERS: $JSON_PARAMS_OVERRIDE
+                      WITH_DEFAULT_TAGS: 'false'
+                      
+                      WAIT: 'true'
+                      WAIT_INTERVAL: 10
+                      
+                      DEBUG: 'true'
+            - step:
+                name: Create Release
+                image: alpine:3.17.3
+                script:
+                  - apk add bash jq git
+                  - TAG=$(wget -qO - 'https://raw.githubusercontent.com/steplix/cicd-steplix/main/aws/ecr-cloudformation/bitbucket/scripts/get-new-tag.sh' | bash -s)
+                  - git tag $TAG
+                  - git push origin --tags
+
