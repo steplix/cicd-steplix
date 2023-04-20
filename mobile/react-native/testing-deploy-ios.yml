@@ -1,0 +1,27 @@
+name: 3. Testing iOS Deployment
+
+run-name: >
+  Testing iOS deployment: Manual dispatch ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+
+jobs:
+  testing-ios:
+    uses: steplix/cicd-steplix/.github/workflows/mob-react-native-testing-deploy-ios.yml@main
+    with:
+      COMMIT_MESSAGE: Manual dispatch ${{ github.ref_name }}
+      PR_BRANCH: master
+      PROJECT_PATH: ios/project.xcodeproj
+      WORKSPACE_PATH: ios/project.xcworkspace
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      FIREBASE_IOS_APP_ID: ${{ secrets.FIREBASE_IOS_APP_ID }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      IOS_MOBILE_PROVISION_BASE64: ${{ secrets.IOS_MOBILE_PROVISION_BASE64 }}
+      IOS_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
