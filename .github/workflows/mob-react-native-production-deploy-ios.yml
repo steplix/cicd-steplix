@@ -1,0 +1,203 @@
+name: Firebase deployment
+
+# Variables needed setted in testing environment
+# AWS_BUCKET
+# ENV_VARIABLES
+# ENV_FILE_NAME
+# IOS_PACKAGE_NAME
+# IOS_SCHEMA
+
+on:
+  workflow_call:
+    inputs:
+      RELEASE_TAG:
+        type: string
+        description: Tag
+        required: true
+      PROJECT_PATH:
+        type: string
+        description: 'xcode project file path. Example: ios/project.xcodeproj'
+        required: true
+      WORKSPACE_PATH:
+        type: string
+        description: 'xcode workspace file path. Example: ios/project.xcworkspace'
+        required: true
+      NODE_VERSION:
+        type: string
+        default: '18'
+        required: false
+      DISABLE_CACHE:
+        type: string
+        default: 'false'
+        required: false
+      SLACK_CHANNEL:
+        type: string
+        required: false
+      RUBY_VERSION:
+        type: string
+        default: ruby
+        required: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+      
+      # IOS
+      IOS_P12_BASE64:
+        required: true
+      IOS_MOBILE_PROVISION_BASE64:
+        required: true
+      IOS_TEAM_ID:
+        required: true
+      IOS_CERTIFICATE_PASSWORD:
+        required: true
+      IOS_APPSTORE_ISSUER_ID:
+        required: true
+      IOS_APPSTORE_API_KEY_ID:
+        required: true
+      IOS_APPSTORE_API_PRIVATE_KEY:
+        required: true
+
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+
+env:
+  RELEASE_TAG: '${{ inputs.RELEASE_TAG }}'
+
+  DISABLE_CACHE: '${{ inputs.DISABLE_CACHE }}'
+  SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
+  NODE_VERSION: '${{ inputs.NODE_VERSION }}'
+  RUBY_VERSION: '${{ inputs.RUBY_VERSION }}'
+
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
+  GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+
+  # IOS
+  IOS_P12_BASE64: '${{ secrets.IOS_P12_BASE64 }}'
+  IOS_MOBILE_PROVISION_BASE64: '${{ secrets.IOS_MOBILE_PROVISION_BASE64 }}'
+  IOS_TEAM_ID: '${{ secrets.IOS_TEAM_ID }}'
+  IOS_CERTIFICATE_PASSWORD: '${{ secrets.IOS_CERTIFICATE_PASSWORD }}'
+  IOS_APPSTORE_ISSUER_ID: '${{ secrets.IOS_APPSTORE_ISSUER_ID }}'
+  IOS_APPSTORE_API_KEY_ID: '${{ secrets.IOS_APPSTORE_API_KEY_ID }}'
+  IOS_APPSTORE_API_PRIVATE_KEY: '${{ secrets.IOS_APPSTORE_API_PRIVATE_KEY }}'
+
+  IOS_OUTPUT_FILEPATH: output.ipa
+
+jobs:
+  deploy:
+    environment: production
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        if: env.DISABLE_CACHE != 'true'
+        id: cache
+        with:
+          path: ./node_modules
+          key: modules-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: (steps.cache.outputs.cache-hit != 'true')
+        run: npm ci --ignore-scripts
+
+      - name: Bump version
+        uses: yanamura/ios-bump-version@v1.7.0
+        with:
+          project-path: ios
+          version: ${{ env.RELEASE_TAG }}
+          build-number: 1
+
+      - name: Modify package.json based on bumped tag
+        shell: bash
+        run: |
+          echo sed -i 's/\"version\":\s*\"[0-9]+\.[0-9]+\.[0-9]+\",\"version\": \"${{ env.RELEASE_TAG }}\"/g' package.json
+
+      - name: Create .env file
+        shell: bash
+        run: echo "${{ vars.ENV_VARIABLES }}" > ${{ vars.ENV_FILE_NAME }}
+
+      - name: Get project name
+        uses: antifree/json-to-variables@v1.0.1
+        with:
+          filename: app.json
+          prefix: app
+      
+      - name: Setup Ruby (bundle)
+        uses: ruby/setup-ruby@v1.144.0
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+
+      - name: Restore Pods cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install Pods
+        run: cd ios && pod install --repo-update
+
+      - name: Build React
+        run: npm run build:ios
+
+      - name: Build IOS App
+        uses: yukiarrr/ios-build-action@v1.5.0
+        with:
+          p12-base64: ${{ env.IOS_P12_BASE64 }}
+          mobileprovision-base64: ${{ env.IOS_MOBILE_PROVISION_BASE64 }}
+          team-id: ${{ env.IOS_TEAM_ID }}
+          certificate-password: ${{ env.IOS_CERTIFICATE_PASSWORD }}
+          code-signing-identity: iPhone Distribution
+          project-path: ${{ inputs.PROJECT_PATH }}
+          workspace-path: ${{ inputs.WORKSPACE_PATH }}
+          scheme: ${{ vars.IOS_SCHEMA }}
+          export-method: app-store
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload artifact S3
+        shell: bash
+        env:
+          FILE_NAME: '${{ vars.IOS_PACKAGE_NAME }}-${{ env.RELEASE_TAG }}.ipa'
+        run: aws s3 cp ${{ env.IOS_OUTPUT_FILEPATH }} s3://${{ vars.AWS_BUCKET }}/${{ env.app_name }}/ios/${{ env.FILE_NAME }}
+
+      - name: Upload app to TestFlight
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: ${{ env.IOS_OUTPUT_FILEPATH }}
+          issuer-id: ${{ secrets.IOS_APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.IOS_APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.IOS_APPSTORE_API_PRIVATE_KEY }}
+
+  notify:
+    runs-on: ubuntu-latest
+    needs:
+      - deploy
+    if: success() || failure()
+    continue-on-error: true
+    steps:
+      - name: Slack Notify
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: push
+          status: failure
+          channel: ${{ env.SLACK_CHANNEL }}

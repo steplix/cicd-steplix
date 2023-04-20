@@ -1,0 +1,28 @@
+name: 2. Testing Android Deployment
+
+run-name: >
+  Testing Android deployment: ${{ github.event.head_commit.message }}
+
+on:
+  push:
+    branches:
+      - testing
+
+jobs:
+  testing-android:
+    uses: steplix/cicd-steplix/.github/workflows/mob-react-native-testing-deploy-android.yml@main
+    with:
+      COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      PR_BRANCH: master
+      ANDROID_KEYSTORE_NAME: ${{ vars.ANDROID_KEYSTORE_NAME }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
