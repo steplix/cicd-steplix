@@ -7,20 +7,13 @@ on:
     branches:
       - 'hotfix/**'
 
-env:
-  NODE_VERSION: ${{ vars.NODE_VERSION }}
-  DESTINATION_PR_MASTER: ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}
-  DESTINATION_PR_DEVELOP: develop
-  SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
-
 jobs:
-
   hotfix:
-    uses: steplix/cicd-steplix/.github/workflows/web-s3-develop-push.yml@feature/addStaticWebWorkflows
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-hotfix-push.yml@feature/addStaticWebWorkflows
     with:
-      NODE_VERSION: ${{ env.NODE_VERSION }}
-      DESTINATION_PR_MASTER: ${{ env.DESTINATION_PR_MASTER }}
-      DESTINATION_PR_DEVELOP: ${{ env.DESTINATION_PR_DEVELOP }}
-      SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
+      NODE_VERSION: ${{ vars.NODE_VERSION }}
+      DESTINATION_PR_MASTER: ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}
+      DESTINATION_PR_DEVELOP: develop
+      SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
