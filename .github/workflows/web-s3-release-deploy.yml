@@ -17,6 +17,10 @@ on:
         type: string
         description: Bucket S3 to download artifact to deploy
         required: true
+      AWS_CLOUDFRONT_DISTRIBUTION_ID:
+        type: string
+        description: CloudFront Distribution ID
+        required: true
     secrets:
       SLACK_WEBHOOK_URL:
         required: true
@@ -25,8 +29,6 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
       AWS_REGION:
-        required: true
-      AWS_CLOUDFRONT_DISTRIBUTION_ID:
         required: true
 
 jobs:
@@ -65,7 +67,7 @@ jobs:
           aws s3 sync output s3://${{ inputs.AWS_BUCKET }}
       - name: Cloudfront invalidation
         run: |
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+          aws cloudfront create-invalidation --distribution-id ${{ inputs.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
   
   
 
