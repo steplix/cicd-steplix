@@ -7,20 +7,15 @@ on:
     branches:
       - develop
 
-env:
-  NODE_VERSION: ${{ vars.NODE_VERSION }}
-  DESTINATION_PR: ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}
-  PR_TITLE: "Pushing develop into ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}"
-  SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
 
 jobs:
 
   develop:
     uses: steplix/cicd-steplix/.github/workflows/web-s3-develop-push.yml@feature/addStaticWebWorkflows
     with:
-      NODE_VERSION: ${{ env.NODE_VERSION }}
-      DESTINATION_PR: ${{ env.DESTINATION_PR }}
-      PR_TITLE: ${{ env.PR_TITLE }}
-      SLACK_CHANNEL: ${{ env.SLACK_CHANNEL }}
+      NODE_VERSION: ${{ vars.NODE_VERSION }}
+      DESTINATION_PR: ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}
+      PR_TITLE: "Pushing develop into ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}"
+      SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
