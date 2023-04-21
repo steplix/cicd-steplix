@@ -28,6 +28,10 @@ on:
         type: string
         description: Bucket S3 to copy files for deploy
         required: true
+      AWS_CLOUDFRONT:
+        type: string
+        description: Only for test
+        required: true
     secrets:
       SLACK_WEBHOOK_URL:
         required: true
@@ -46,6 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       #BUILD
+      - run:  echo "aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths /*"
       - run:  echo "aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths /*"
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
