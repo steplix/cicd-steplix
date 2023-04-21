@@ -69,7 +69,7 @@ jobs:
           aws s3 sync out s3://${{ inputs.AWS_BUCKET }}
       - name: Cloudfront invalidation
         run: |
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT }} --paths "/*"
   
 
   generate-pr:
