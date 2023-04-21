@@ -31,9 +31,16 @@ on:
 jobs:
 
   testing:
-    uses: steplix/cicd-steplix/.github/workflows/web-s3-validate.yml@main
-    with:
-      node-version: ${{ inputs.NODE_VERSION }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run test --if-present
+      - run: echo "TEST SUCCESSFULLY"
 
   build:
     needs: [ testing ]
