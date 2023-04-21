@@ -28,9 +28,9 @@ on:
         type: string
         description: Bucket S3 to copy files for deploy
         required: true
-      AWS_CLOUDFRONT:
+      AWS_CLOUDFRONT_DISTRIBUTION_ID:
         type: string
-        description: Only for test
+        description: CloudFront Distribution ID
         required: true
     secrets:
       SLACK_WEBHOOK_URL:
@@ -41,8 +41,6 @@ on:
         required: true
       AWS_REGION:
         required: true
-      AWS_CLOUDFRONT_DISTRIBUTION_ID:
-        required: true
 
 jobs:
 
@@ -50,8 +48,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       #BUILD
-      - run:  echo "aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths /*"
-      - run:  echo "aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT }} --paths /*"
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
@@ -69,7 +65,7 @@ jobs:
           aws s3 sync out s3://${{ inputs.AWS_BUCKET }}
       - name: Cloudfront invalidation
         run: |
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT }} --paths "/*"
+          aws cloudfront create-invalidation --distribution-id ${{ inputs.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
   
 
   generate-pr:
