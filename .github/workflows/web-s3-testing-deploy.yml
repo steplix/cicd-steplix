@@ -51,7 +51,7 @@ jobs:
     steps:
       #BUILD
       - run:  echo "aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths /*"
-      - run:  echo "aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths /*"
+      - run:  echo "aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT }} --paths /*"
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
