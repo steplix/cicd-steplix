@@ -3,7 +3,9 @@ run-name: >
   ${{ github.event.pull_request.title }}
 
 on:
-  push:
+  pull_request_target:
+    types:
+      - closed
     branches:
       - master
 
@@ -16,8 +18,11 @@ jobs:
       NODE_VERSION: ${{ vars.NODE_VERSION }}
       SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
       AWS_BUCKET: ${{ vars.PROD_AWS_BUCKET_ARTIFACT }}
+      TEXT-WHERE-SEARCH-FOR-PARAMETERS: ${{ github.event.pull_request.title }}
+
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
       AWS_KEY_ID: ${{ secrets.TEST_AWS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.TEST_AWS_REGION }}
+
