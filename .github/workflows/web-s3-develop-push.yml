@@ -66,16 +66,12 @@ jobs:
           destination_branch: ${{ inputs.DESTINATION_PR }}
           pr_title: ${{ inputs.PR_TITLE }}
       - run: echo "PR GENERATED SUCCESSFULLY"
-
-  notify:
-    if: ${{ always() }}
-    needs: [testing, build, generate-pr]
-    runs-on: ubuntu-latest
-    steps:
       - name: Notify Slack
         uses: steplix/cicd-notify@1.0.0
         with:
-          template: 'push'
-          status: ${{ needs.testing.result || needs.build.result || needs.generate-pr.result }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          template: pr
+          status: ${{ job.status }}
           channel: ${{ inputs.SLACK_CHANNEL }}
+        env:
+          PR_URL: ${{ steps.open-pr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.open-pr.outputs.pr_number }}

@@ -59,12 +59,21 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: generate-pr
-        id: open-pr
+        id: pr-to-main
         uses: repo-sync/pull-request@v2
         with:
           destination_branch: ${{ inputs.DESTINATION_PR_MASTER }}
           pr_title: "<patch> is TAG VERSION INCREMENT: Pushing HOTFIX ${{ github.ref_name }} into ${{ inputs.DESTINATION_PR_MASTER }}"
-      - run: echo "PR GENERATED SUCCESSFULLY"
+      - run: echo "PR TO ${{ inputs.DESTINATION_PR_MASTER }} GENERATED SUCCESSFULLY"
+      - name: Notify Slack
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: pr
+          status: ${{ job.status }}
+          channel: ${{ inputs.SLACK_CHANNEL }}
+        env:
+          PR_URL: ${{ steps.pr-to-main.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.pr-to-main.outputs.pr_number }}
 
   generate-pr-to-develop:
     needs: [testing,build]
@@ -78,15 +87,19 @@ jobs:
           destination_branch: ${{ inputs.DESTINATION_PR_DEVELOP }}
           pr-title: "Pushing HOTFIX ${{ github.ref_name }} into ${{ inputs.DESTINATION_PR_DEVELOP }}"
 
-  notify:
-    if: ${{ always() }}
-    needs: [ testing,build,generate-pr-to-master,generate-pr-to-develop ]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify Slack
-        uses: steplix/cicd-notify@1.0.0
-        with:
-          template: 'push'
-          status: ${{ needs.testing.result || needs.build.result || needs.generate-pr-to-master.result || needs.generate-pr-to-develop.result }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-          channel: ${{ inputs.SLACK_CHANNEL }}
+  notify-failure:
+      runs-on: ubuntu-latest
+      needs:
+        - testing
+        - build
+        - generate-pr-to-master
+        - generate-pr-to-develop
+      if: failure()
+      continue-on-error: true
+      steps:
+        - name: Slack Notify
+          uses: steplix/cicd-notify@1.0.0
+          with:
+            template: push
+            status: failure
+            channel: ${{ env.SLACK_CHANNEL }}
