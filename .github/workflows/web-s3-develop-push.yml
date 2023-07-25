@@ -1,6 +1,6 @@
 name: Push in development branch
 run-name: >
-  "Create PR FROM develop TO ${{ inputs.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}: ${{ github.event.head_commit.message }}"
+  "Create PR FROM develop TO ${{ inputs.DESTINATION_PR }}: ${{ github.event.head_commit.message }}"
 
 on:
   workflow_call:
@@ -72,6 +72,21 @@ jobs:
           template: pr
           status: ${{ job.status }}
           channel: ${{ inputs.SLACK_CHANNEL }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
         env:
           PR_URL: ${{ steps.open-pr.outputs.pr_url }}
           PR_NUMBER: ${{ steps.open-pr.outputs.pr_number }}
+
+
+  notify-failure:
+    if: failure()
+    needs: [ testing, build, generate-pr ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: 'push'
+          status: failure
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          channel: ${{ inputs.SLACK_CHANNEL }}
