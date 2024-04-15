@@ -9,7 +9,7 @@ docker:test:
     - docker:dind
   before_script:
     - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
-    - pip install awscli
+    - pip install awscli --break-system-packages
     - ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
     - DOCKER_URL=${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${AWS_ECR_REPOSITORY}
   script:
@@ -33,7 +33,7 @@ deploy:test:
         STACK_PREFIX: $CI_PROJECT_NAME
   before_script:
     - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
-    - pip install awscli
+    - pip install awscli --break-system-packages
   script:
     - >
       aws cloudformation deploy

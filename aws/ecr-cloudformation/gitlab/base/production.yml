@@ -8,7 +8,7 @@ deploy:production:
   when: manual
   before_script:
     - apk add --cache-dir $APK_CACHE_DIR python3 py-pip
-    - pip install awscli
+    - pip install awscli --break-system-packages
   script:
     - >
       aws cloudformation deploy
