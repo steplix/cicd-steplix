@@ -3,6 +3,8 @@ include:
 
 docker:test:
   stage: docker
+  tags:
+    - dind
   image: docker:rc
   allow_failure: false
   services:
