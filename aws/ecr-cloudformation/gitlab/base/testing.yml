@@ -5,6 +5,8 @@ docker:test:
   stage: docker
   tags:
     - dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
   image: docker:rc
   allow_failure: false
   services:
