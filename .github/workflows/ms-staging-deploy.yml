@@ -7,15 +7,6 @@ on:
         type: string
         description: "Pass the head commit message {{ github.event.head_commit.message }}"
         required: true
-      AWS_ECR_REPOSITORY:
-        type: string
-        description: "AWS ECR Repository name"
-        required: true
-      AWS_CF_STACK_NAME:
-        type: string
-        default: '${{ github.event.repository.name }}'
-        description: "AWS cloud-formation stack name"
-        required: false
       DISABLE_DEPLOY:
         type: string
         default: 'false'
@@ -30,6 +21,14 @@ on:
         type: string
         description: Slack channel to send notifications
         required: false
+      AWS_BUCKET_BACKUP_STEPLIX:
+        type: string
+        description: AWS bucket name for backup
+        required: false
+      STEPLIX_BACKUP_PATH:
+        type: string
+        description: Path where the backup will be saved
+        required: false
     secrets:
       SLACK_WEBHOOK_URL:
         required: true
@@ -42,20 +41,27 @@ on:
       AWS_CLOUDFORMATION_PARAMS_OVERRIDE:
         required: false
 
+      AWS_ACCESS_KEY_ID_BACKUP:
+        required: false
+      AWS_SECRET_ACCESS_KEY_BACKUP:
+        required: false
+      AWS_REGION_BACKUP:
+        required: false
+
 env:
   COMMIT_MESSAGE: '${{ inputs.COMMIT_MESSAGE }}'
   DISABLE_CACHE: '${{ inputs.DISABLE_CACHE }}'
-  AWS_ECR_REPOSITORY: '${{ inputs.AWS_ECR_REPOSITORY }}'
-  AWS_CF_STACK_NAME: '${{ inputs.AWS_CF_STACK_NAME || github.event.repository.name }}'
   SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
+
+  AWS_BUCKET_BACKUP_STEPLIX: '${{ inputs.AWS_BUCKET_BACKUP_STEPLIX }}'
+  STEPLIX_BACKUP_PATH: '${{ inputs.STEPLIX_BACKUP_PATH }}'
 
   # Secrets
   SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
   AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
   AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
   AWS_REGION: '${{ secrets.AWS_REGION }}'
-  AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
 jobs:
   pre-tag:
@@ -66,7 +72,8 @@ jobs:
         with:
           param-0: major
           param-1: minor
-          param-2: skip-staging-deploy
+          param-2: skip-deploy
+          message: ${{ env.COMMIT_MESSAGE }}
 
       - uses: actions/checkout@v3
       
@@ -91,17 +98,26 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - uses: steplix/cicd-steplix-deploy-ecr-and-cloudformation@v1
+      - uses: steplix/cicd-steplix-deploy-ecr-and-cloudformation@v3
         with:
           ENVIRONMENT: staging
-          AWS_ECR_REPOSITORY: ${{ env.AWS_ECR_REPOSITORY }}
-          AWS_CF_STACK_NAME: ${{ env.AWS_CF_STACK_NAME }}
+          AWS_ECR_REPOSITORY: ${{ vars.AWS_ECR_REPOSITORY }}
+          AWS_CF_STACK_NAME: ${{ vars.AWS_CF_STACK_NAME || github.event.repository.name }}
           AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ env.AWS_REGION }}
-          AWS_CLOUDFORMATION_PARAMS_OVERRIDE: ${{ env.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}
+          AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE || vars.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
           DISABLE_CACHE: ${{ env.DISABLE_CACHE }}
           TAG: ${{ needs.pre-tag.outputs.version }}
+          CAPABILITIES: CAPABILITY_NAMED_IAM
+          CONCAT_ENV_CF_STACK_NAME: false
+
+          AWS_ACCESS_KEY_ID_BACKUP: ${{ secrets.AWS_ACCESS_KEY_ID_BACKUP }}
+          AWS_SECRET_ACCESS_KEY_BACKUP: ${{ secrets.AWS_SECRET_ACCESS_KEY_BACKUP }}
+          AWS_REGION_BACKUP: ${{ secrets.AWS_REGION_BACKUP }}
+
+          AWS_BUCKET_BACKUP_STEPLIX: ${{ env.AWS_BUCKET_BACKUP_STEPLIX }}
+          STEPLIX_BACKUP_PATH: ${{ env.STEPLIX_BACKUP_PATH }}
 
   tag:
     runs-on: ubuntu-latest
@@ -118,6 +134,7 @@ jobs:
         with:
           param-0: major
           param-1: minor
+          message: ${{ env.COMMIT_MESSAGE }}
 
       - uses: actions/checkout@v3
       
@@ -139,6 +156,7 @@ jobs:
           template: release
           status: ${{ job.status }}
           channel: ${{ env.SLACK_CHANNEL }}
+          icon_url: ${{ vars.SLACK_LOGO_URL }}
         env:
           NEW_TAG: ${{ steps.new-tag.outputs.version }}
 
@@ -157,3 +175,4 @@ jobs:
           template: push
           status: failure
           channel: ${{ env.SLACK_CHANNEL }}
+          icon_url: ${{ vars.SLACK_LOGO_URL }}
