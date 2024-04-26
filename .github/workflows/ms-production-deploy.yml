@@ -6,15 +6,6 @@ on:
       RELEASE_TAG:
         type: string
         required: true
-      AWS_ECR_REPOSITORY:
-        type: string
-        description: "AWS ECR Repository name"
-        required: true
-      AWS_CF_STACK_NAME:
-        type: string
-        default: '${{ github.event.repository.name }}'
-        description: "AWS cloud-formation stack name"
-        required: false
       DISABLE_CACHE:
         type: string
         default: 'false'
@@ -23,6 +14,14 @@ on:
       SLACK_CHANNEL:
         type: string
         description: Slack channel to send notifications
+        required: false
+      AWS_BUCKET_BACKUP_STEPLIX:
+        type: string
+        description: AWS bucket name for backup
+        required: false
+      STEPLIX_BACKUP_PATH:
+        type: string
+        description: Path where the backup will be saved
         required: false
     secrets:
       SLACK_WEBHOOK_URL:
@@ -35,37 +34,53 @@ on:
         required: true
       AWS_CLOUDFORMATION_PARAMS_OVERRIDE:
         required: false
+      
+      AWS_ACCESS_KEY_ID_BACKUP:
+        required: false
+      AWS_SECRET_ACCESS_KEY_BACKUP:
+        required: false
+      AWS_REGION_BACKUP:
+        required: false
 
 env:
   RELEASE_TAG: '${{ inputs.RELEASE_TAG }}'
-  AWS_ECR_REPOSITORY: '${{ inputs.AWS_ECR_REPOSITORY }}'
-  AWS_CF_STACK_NAME: '${{ inputs.AWS_CF_STACK_NAME || github.event.repository.name }}'
   DISABLE_CACHE: '${{ inputs.DISABLE_CACHE }}'
   SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
+
+  AWS_BUCKET_BACKUP_STEPLIX: '${{ inputs.AWS_BUCKET_BACKUP_STEPLIX }}'
+  STEPLIX_BACKUP_PATH: '${{ inputs.STEPLIX_BACKUP_PATH }}'
 
   # Secrets
   SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
   AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
   AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
   AWS_REGION: '${{ secrets.AWS_REGION }}'
-  AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: steplix/cicd-steplix-deploy-ecr-and-cloudformation@v1
+      - uses: steplix/cicd-steplix-deploy-ecr-and-cloudformation@v3
         with:
           ENVIRONMENT: production
-          AWS_ECR_REPOSITORY: ${{ env.AWS_ECR_REPOSITORY }}
-          AWS_CF_STACK_NAME: ${{ env.AWS_CF_STACK_NAME }}
+          AWS_ECR_REPOSITORY: ${{ vars.AWS_ECR_REPOSITORY }}
+          AWS_CF_STACK_NAME: ${{ vars.AWS_CF_STACK_NAME || github.event.repository.name }}
           AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ env.AWS_REGION }}
-          AWS_CLOUDFORMATION_PARAMS_OVERRIDE: ${{ env.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}
+          AWS_CLOUDFORMATION_PARAMS_OVERRIDE: '${{ secrets.AWS_CLOUDFORMATION_PARAMS_OVERRIDE || vars.AWS_CLOUDFORMATION_PARAMS_OVERRIDE }}'
           TAG: ${{ env.RELEASE_TAG }}
           DISABLE_CACHE: ${{ env.DISABLE_CACHE }}
+          CAPABILITIES: CAPABILITY_NAMED_IAM
+          CONCAT_ENV_CF_STACK_NAME: false
+
+          AWS_ACCESS_KEY_ID_BACKUP: ${{ secrets.AWS_ACCESS_KEY_ID_BACKUP }}
+          AWS_SECRET_ACCESS_KEY_BACKUP: ${{ secrets.AWS_SECRET_ACCESS_KEY_BACKUP }}
+          AWS_REGION_BACKUP: ${{ secrets.AWS_REGION_BACKUP }}
+
+          AWS_BUCKET_BACKUP_STEPLIX: ${{ env.AWS_BUCKET_BACKUP_STEPLIX }}
+          STEPLIX_BACKUP_PATH: ${{ env.STEPLIX_BACKUP_PATH }}
 
   notify:
     runs-on: ubuntu-latest
@@ -80,3 +95,4 @@ jobs:
           template: push
           status: ${{ needs.deploy.result }}
           channel: ${{ env.SLACK_CHANNEL }}
+          icon_url: ${{ vars.SLACK_LOGO_URL }}
