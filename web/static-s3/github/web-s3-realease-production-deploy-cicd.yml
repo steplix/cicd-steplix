@@ -1,0 +1,22 @@
+name: Deployment to production
+run-name: >
+  Production deployment ${{ github.event.release.tag_name }}: ${{ github.event.release.name }}
+on:
+  release:
+    types: [published]
+
+
+jobs:
+
+  production:
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-release-deploy.yml@feature/addStaticWebWorkflows
+    with:
+      AWS_BUCKET: ${{ vars.PROD_AWS_BUCKET }}
+      AWS_BUCKET_ARTIFACT: ${{ vars.PROD_AWS_BUCKET_ARTIFACT }}
+      SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
+      AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.PROD_AWS_CLOUDFRONT_DISTRIBUTION_ID }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      AWS_KEY_ID: ${{ secrets.PROD_AWS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.PROD_AWS_REGION }}

@@ -1,0 +1,21 @@
+name: Push in development branch
+run-name: >
+  "Create PR FROM develop TO ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}: ${{ github.event.head_commit.message }}"
+
+on:
+  push:
+    branches:
+      - develop
+
+
+jobs:
+
+  develop:
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-develop-push.yml@feature/addStaticWebWorkflows
+    with:
+      NODE_VERSION: ${{ vars.NODE_VERSION }}
+      DESTINATION_PR: ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}
+      PR_TITLE: "Pushing develop into ${{ vars.DESTINATION_PR_ON_DEVELOP_WORKFLOW }}"
+      SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
