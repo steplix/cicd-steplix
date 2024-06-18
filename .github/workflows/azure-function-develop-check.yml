@@ -1,0 +1,65 @@
+name: Develop checking
+
+on:
+  workflow_call:
+    inputs:
+      pr-branch:
+        type: string
+        default: testing
+        required: false
+    secrets:
+      slack-webhook:
+        required: true
+      aws-access-key-id:
+        required: true
+      aws-secret-access-key:
+        required: true
+      aws-region:
+        required: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - run: npm ci
+        working-directory: ./src
+      - run: npm test --if-present
+        working-directory: ./src
+      - run: npm run lint --if-present
+        working-directory: ./src
+      - name: Close workflow
+        if: failure()
+        uses: andymckay/cancel-action@0.2
+
+#  validate-azure-function:
+#    runs-on: ubuntu-latest
+#    steps:
+
+
+  generate-pr:
+    needs: [test, validate-sam]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: generate-pr
+        id: pr
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: ${{ inputs.pr-branch }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Slack Notify
+        if: success()
+        continue-on-error: true
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: pr
+          status: ${{ job.status }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.slack-webhook }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
