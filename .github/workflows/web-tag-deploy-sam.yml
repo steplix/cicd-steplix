@@ -1,0 +1,211 @@
+name: >
+  Web deployment by Tag with AWS SAM. 
+  Gets the RELEASE TAG and deploys the changes to the corresponding environment:
+  - 'v1.0.1-testing'  -> deploy to Testing  
+  - 'v1.0.1-staging'  -> deploy to Staging
+  - 'v1.0.1'          -> deploy to Production
+  Additionally, for Production and Staging, it creates a backup and saves it in a Steplix bucket.  
+
+on:
+  workflow_call:
+    inputs:
+      RELEASE_TAG:
+        type: string
+        required: true
+      NODE_VERSION:
+        type: string
+        required: true
+      SLACK_CHANNEL:
+        type: string
+        description: 'Slack channel to send notifications'
+        required: false
+      STEPLIX_BACKUP_PATH:
+        type: string
+        description: Path where the backup will be saved
+        required: false
+      AWS_BUCKET_BACKUP_STEPLIX:
+        type: string
+        description: AWS bucket name for backup
+        required: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+      AWS_ACCESS_KEY_ID_STAGING:
+        required: false
+      AWS_SECRET_ACCESS_KEY_STAGING:
+        required: false
+      AWS_REGION_STAGING:
+        required: false
+      AWS_ACCESS_KEY_ID_PRODUCTION:
+        required: false
+      AWS_SECRET_ACCESS_KEY_PRODUCTION:
+        required: false
+      AWS_REGION_PRODUCTION:
+        required: false
+      AWS_ACCESS_KEY_ID_BACKUP:
+        required: false
+      AWS_SECRET_ACCESS_KEY_BACKUP:
+        required: false
+      AWS_REGION_BACKUP:
+        required: false
+
+env:
+  SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
+  NODE_VERSION: '${{ inputs.NODE_VERSION }}'
+  STEPLIX_BACKUP_PATH: '${{ inputs.STEPLIX_BACKUP_PATH }}'
+  AWS_BUCKET_BACKUP_STEPLIX: '${{ inputs.AWS_BUCKET_BACKUP_STEPLIX }}'
+
+  # Secrets
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
+  AWS_ACCESS_KEY_ID: '${{ secrets.AWS_ACCESS_KEY_ID }}'
+  AWS_SECRET_ACCESS_KEY: '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+  AWS_REGION: '${{ secrets.AWS_REGION }}'
+  AWS_ACCESS_KEY_ID_STAGING: '${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}'
+  AWS_SECRET_ACCESS_KEY_STAGING: '${{ secrets.AWS_SECRET_ACCESS_KEY_STAGING }}'
+  AWS_REGION_STAGING: '${{ secrets.AWS_REGION_STAGING }}'
+  AWS_ACCESS_KEY_ID_PRODUCTION: '${{ secrets.AWS_ACCESS_KEY_ID_PRODUCTION }}'
+  AWS_SECRET_ACCESS_KEY_PRODUCTION: '${{ secrets.AWS_SECRET_ACCESS_KEY_PRODUCTION }}'
+  AWS_REGION_PRODUCTION: '${{ secrets.AWS_REGION_PRODUCTION }}'
+  AWS_ACCESS_KEY_ID_BACKUP: '${{ secrets.AWS_ACCESS_KEY_ID_STEPLIX }}'
+  AWS_SECRET_ACCESS_KEY_BACKUP: '${{ secrets.AWS_SECRET_ACCESS_KEY_STEPLIX }}'
+  AWS_REGION_BACKUP: '${{ secrets.AWS_REGION_STEPLIX }}'
+
+jobs:
+  infer-environment:
+    uses: steplix/cicd-steplix/.github/workflows/infer-environment.yml@master
+    with:
+      RELEASE_TAG: ${{ inputs.RELEASE_TAG }}
+
+  validate-user-deploy:
+    needs: infer-environment
+    uses: steplix/cicd-steplix/.github/workflows/validate-user-deploy.yml@master
+    with:
+      ENVIRONMENT: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+
+  build-deploy:
+    needs:
+      - infer-environment
+      - validate-user-deploy
+    runs-on: ubuntu-22.04
+    environment: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+    steps:
+      #BUILD
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - run: ./set_env_vars.sh '${{ vars.ENV_PARAMETERS }}';
+      - run: npm ci
+
+      - name: Creating App release '${{ inputs.RELEASE_TAG }}' for '${{ needs.infer-environment.outputs.ENVIRONMENT }}'
+        run: npm run release
+        env:
+          NEXT_PUBLIC_VERSION: ${{ inputs.RELEASE_TAG }}
+
+      - name: Creating SAM release '${{ inputs.RELEASE_TAG }}' for '${{ needs.infer-environment.outputs.ENVIRONMENT }}'
+        run: sam build --config-env ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+
+        #DEPLOY
+      - uses: aws-actions/configure-aws-credentials@v3
+        if: needs.infer-environment.outputs.ENVIRONMENT =='testing'
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      #@TODO: Look for a better way to configure AWS credentials
+      - uses: aws-actions/configure-aws-credentials@v3
+        if: needs.infer-environment.outputs.ENVIRONMENT == 'staging'
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID_STAGING }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY_STAGING }}
+          aws-region: ${{ env.AWS_REGION_STAGING }}
+
+      - uses: aws-actions/configure-aws-credentials@v3
+        if: needs.infer-environment.outputs.ENVIRONMENT == 'production'
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID_PRODUCTION }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY_PRODUCTION }}
+          aws-region: ${{ env.AWS_REGION_PRODUCTION }}
+
+      - name: deploy SAM Infrastructure
+        run: >-
+          sam deploy
+          --no-confirm-changeset
+          --no-fail-on-empty-changeset
+          --config-env ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+          --parameter-overrides
+          Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }} ${{ vars.AWS_SAM_PARAMS_OVERRIDE }}
+
+      - name: Deploy static content to Stack '${{ vars.AWS_STACK_NAME }}'
+        run: |
+          bash deploy.sh --stack-name ${{ vars.AWS_STACK_NAME }}
+
+      - name: Notify Slack of new available release
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: release
+          status: ${{ job.status }}
+          channel: ${{ env.SLACK_CHANNEL }}
+          icon_url: ${{ vars.SLACK_LOGO_URL }}
+        env:
+          NEW_TAG: ${{ inputs.RELEASE_TAG }}
+
+  #STEPLIX BACKUP
+  backup:
+    if: needs.infer-environment.outputs.ENVIRONMENT == 'staging' || needs.infer-environment.outputs.ENVIRONMENT == 'production'
+    needs:
+      - build-deploy
+    runs-on: ubuntu-22.04
+    environment: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+    steps:
+      #BUILD
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: ./set_env_vars.sh '${{ vars.ENV_PARAMETERS }}';
+      - run: npm ci
+      - run: npm run release
+
+      #STEPLIX BACKUP
+      - name: Generate artifact zip
+        id: zip
+        run: cd out && tar -czvf ${{ env.RELEASE_TAG }}.tar.gz *
+
+      - name: Configure Steplix AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_BACKUP }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_BACKUP }}
+          aws-region: ${{ secrets.AWS_REGION_BACKUP }}
+
+      - name: Upload artifact to Steplix s3 Backup
+        shell: bash
+        env:
+          ZIP_FILENAME: "${{ needs.infer-environment.outputs.ENVIRONMENT }}.${{ env.RELEASE_TAG }}.tar.gz"
+          S3_BACKUP_URI: s3://${{ vars.AWS_BUCKET_BACKUP_STEPLIX }}/${{ vars.STEPLIX_BACKUP_PATH }}
+        run: aws s3 cp out/${{ env.RELEASE_TAG }}.tar.gz ${{ env.S3_BACKUP_URI }}/${{ env.ZIP_FILENAME }}
+
+  notify-failure:
+    runs-on: ubuntu-22.04
+    needs:
+      - build-deploy
+    if: failure()
+    continue-on-error: true
+    steps:
+      - name: Slack Notify
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: push
+          status: failure
+          icon_url: ${{ vars.SLACK_LOGO_URL }}

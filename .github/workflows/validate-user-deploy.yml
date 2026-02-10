@@ -1,0 +1,57 @@
+name: >
+  Validate User Roles to Deploy
+
+on:
+  workflow_call:
+    inputs:
+      ENVIRONMENT:
+        description: 'Selected environment to deploy'
+        required: true
+        type: string
+
+jobs:
+  validate-user-deploy:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Show executing user and environment
+        run: |
+          echo "User: '${{ github.actor }}', Environment: '${{ inputs.ENVIRONMENT }}'"
+
+      - name: Validate user role to deploy in '${{ inputs.ENVIRONMENT }}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          ENVIRONMENT="${{ inputs.ENVIRONMENT }}"
+          USER_ROLE=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$REPO/collaborators/$ACTOR/permission" \
+            | jq -r '.permission')
+          
+          echo "User '$ACTOR' has permissions: '$USER_ROLE'"
+          echo "Running on environment: '$ENVIRONMENT'"
+          
+          # Si el usuario es un bot, permitir ejecución
+          # Allow execution if the user is bot
+          if [[ "$ACTOR" == *"[bot]"* ]]; then
+            echo "✅ Detected bot user ($ACTOR). Skipping permission check."
+            exit 0
+          fi
+          
+          ALLOWED=false
+          if [[ "$ENVIRONMENT" == "testing" ]]; then
+            ALLOWED=true
+          elif [[ "$ENVIRONMENT" == "staging" || "$ENVIRONMENT" == "production" ]]; then
+            if [[ "$USER_ROLE" == "admin" ]]; then
+              ALLOWED=true
+            fi
+          fi
+
+          if [[ "$ALLOWED" == "false" ]]; then
+            echo "❌ User $ACTOR is not authorized for $ENVIRONMENT. Stopping pipeline."
+            exit 1
+          fi
+
+      - name: Continue pipeline execution
+        run: echo "✅ User authorized. Proceeding..."
