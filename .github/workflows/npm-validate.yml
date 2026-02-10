@@ -1,0 +1,51 @@
+name: >
+  Validate node applications by running tests. 
+  Caching dependencies based on package-lock.json
+
+on:
+  workflow_call:
+    inputs:
+      NODE_VERSION:
+        type: string
+        default: '20.16.0'
+        required: false
+      ENABLE_CACHE:
+        type: string
+        default: 'true'
+        description: Enable package.json cache
+        required: false
+
+env:
+  NODE_VERSION: '${{ inputs.NODE_VERSION }}'
+  ENABLE_CACHE: '${{ inputs.ENABLE_CACHE }}'
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Cache dependencies
+        if: env.ENABLE_CACHE == 'true'
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: ./node_modules
+          key: modules-${{ hashFiles('package-lock.json') }}
+      - name: Install dependencies
+        if: (steps.cache.outputs.cache-hit != 'true')
+        run: npm ci --ignore-scripts
+      - name: Check and install database migrations dependencies
+        run: |
+          if [ -f "database/package.json" ]; then
+            echo "Installing migrations dependencies..."
+            cd database && npm ci --ignore-scripts
+          else
+            echo "Skipping migrations installation."
+          fi
+      - name: Run tests
+        run: npm run test --if-present
