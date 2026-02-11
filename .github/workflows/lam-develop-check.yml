@@ -42,8 +42,6 @@ jobs:
         with:
           python-version: '3.11'
       - uses: aws-actions/setup-sam@v2
-        with:
-          version: latest
 
       - name: Show tool versions
         run: |
