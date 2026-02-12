@@ -71,6 +71,7 @@ jobs:
         with:
           destination_branch: ${{ inputs.pr-branch }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_title: 'Merge ${{ github.ref }} into ${{ inputs.pr-branch }}'
 
       - name: Slack Notify
         if: success()
