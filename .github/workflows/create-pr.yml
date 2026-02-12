@@ -1,0 +1,65 @@
+name: >
+  Create Pull Request
+
+on:
+  workflow_call:
+    inputs:
+      COMMIT_MESSAGE:
+        type: string
+        description: "Pass the head commit message {{ github.event.head_commit.message }}"
+        required: true
+      ORIGIN_BRANCH:
+        type: string
+        description: Origin branch to generate PR
+        required: true
+      DEST_BRANCH:
+        type: string
+        description: Destination branch to generate PR
+        required: true
+      SLACK_CHANNEL:
+        type: string
+        description: Slack channel to send notifications
+        required: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+env:
+  COMMIT_MESSAGE: '${{ inputs.COMMIT_MESSAGE }}'
+  ORIGIN_BRANCH: '${{ inputs.ORIGIN_BRANCH }}'
+  DEST_BRANCH: '${{ inputs.DEST_BRANCH }}'
+  SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
+
+  # Secrets
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-22.04
+    name: Create PR
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v3
+
+      - name: Create Pull Request from '${{env.ORIGIN_BRANCH}}' to '${{env.DEST_BRANCH}}'
+        id: pr
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: ${{env.ORIGIN_BRANCH}}
+          destination_branch: ${{env.DEST_BRANCH}}
+          pr_title: "Release to ${{env.DEST_BRANCH}}: ${{ env.COMMIT_MESSAGE }}"
+          pr_body: Automated PR from '${{env.ORIGIN_BRANCH}}' to '${{env.DEST_BRANCH}}'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Slack
+        uses: steplix/cicd-notify@1.0.0
+        continue-on-error: true
+        with:
+          template: pr
+          status: ${{ job.status }}
+          channel: '${{ env.SLACK_CHANNEL }}'
+          icon_url: ${{ vars.SLACK_LOGO_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
