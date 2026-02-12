@@ -24,7 +24,7 @@ on:
 
 jobs:
   check-aws-credentials:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       is-valid: ${{ steps.is-valid.outputs.is-valid }}
     steps:
@@ -39,18 +39,18 @@ jobs:
   build-deploy:
     needs: check-aws-credentials
     if: needs.check-aws-credentials.outputs.is-valid == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-      - uses: aws-actions/setup-sam@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
         with:
-          version: 1.59.0
+          python-version: '3.11'
+      - uses: aws-actions/setup-sam@v2
 
       - name: build SAM
-        run: sam build --config-env ${{ inputs.environment }}
+        run: sam build --parallel --config-env ${{ inputs.environment }}
 
-      - uses: aws-actions/configure-aws-credentials@v1
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.aws-access-key-id }}
           aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
@@ -62,9 +62,9 @@ jobs:
   generate-pr:
     needs: build-deploy
     if: ${{ inputs.pr-branch != '' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: create-pr
         id: pr
         uses: repo-sync/pull-request@v2
@@ -85,7 +85,7 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
 
   slack-notify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs:
       - check-aws-credentials
       - build-deploy
