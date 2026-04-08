@@ -41,15 +41,15 @@ permissions:
 env:
   SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
   NODE_VERSION: '${{ inputs.NODE_VERSION }}'
+  AWS_REGION_TESTING: '${{ inputs.AWS_REGION_TESTING }}'
+  AWS_REGION_STAGING: '${{ inputs.AWS_REGION_STAGING }}'
+  AWS_REGION_PRODUCTION: '${{ inputs.AWS_REGION_PRODUCTION }}'
 
   # Secrets
   SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
   AWS_ROLE_ARN_TESTING: '${{ secrets.AWS_ROLE_ARN_TESTING }}'
-  AWS_REGION_TESTING: '${{ secrets.AWS_REGION_TESTING }}'
   AWS_ROLE_ARN_STAGING: '${{ secrets.AWS_ROLE_ARN_STAGING }}'
-  AWS_REGION_STAGING: '${{ secrets.AWS_REGION_STAGING }}'
   AWS_ROLE_ARN_PRODUCTION: '${{ secrets.AWS_ROLE_ARN_PRODUCTION }}'
-  AWS_REGION_PRODUCTION: '${{ secrets.AWS_REGION_PRODUCTION }}'
 
 jobs:
   infer-environment:
