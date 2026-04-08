@@ -1,8 +1,8 @@
 name: >
   Get environment from tag
-  - 'v1.0.1-testing'  -> testing
-  - 'v1.0.1-staging'  -> staging
-  - 'v1.0.1'          -> production
+  - 'v1.0.1-testing' | 'testing/xxx'  -> testing
+  - 'v1.0.1-staging' | 'staging/xxx'  -> staging
+  - 'v1.0.1'                          -> production
 
 on:
   workflow_call:
@@ -26,12 +26,16 @@ jobs:
         run: |
           if [[ "${{ inputs.RELEASE_TAG }}" =~ ^v?[0-9]{1,10}\.[0-9]{1,10}\.[0-9]{1,10}\-testing(\.[0-9]{1,10})?$ ]]; then
             echo "ENVIRONMENT=testing" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^testing\/[A-Za-z0-9]+$ ]]; then
+            echo "ENVIRONMENT=testing" >> "$GITHUB_OUTPUT"
           elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^v?[0-9]{1,10}\.[0-9]{1,10}\.[0-9]{1,10}\-staging(\.[0-9]{1,10})?$ ]]; then
+            echo "ENVIRONMENT=staging" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^staging\/[A-Za-z0-9]+$ ]]; then
             echo "ENVIRONMENT=staging" >> "$GITHUB_OUTPUT"
           elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^v?[0-9]{1,10}\.[0-9]{1,10}\.[0-9]{1,10}$ ]]; then
             echo "ENVIRONMENT=production" >> "$GITHUB_OUTPUT"
           else
-            echo "Error: El release ${{ inputs.RELEASE_TAG }} no es válido. Debe ser 'vX.X.X-testing', 'vX.X.X-staging' o 'vX.X.X'." >&2
+            echo "Error: El release ${{ inputs.RELEASE_TAG }} no es válido. Debe ser 'vX.X.X-testing', 'testing/XXX', 'vX.X.X-staging', 'staging/XXX' o 'vX.X.X'." >&2
             exit 1
           fi
       - name: Log inferred environment '${{ steps.set-environment.outputs.ENVIRONMENT }}'
