@@ -26,11 +26,11 @@ jobs:
         run: |
           if [[ "${{ inputs.RELEASE_TAG }}" =~ ^v?[0-9]{1,10}\.[0-9]{1,10}\.[0-9]{1,10}\-testing(\.[0-9]{1,10})?$ ]]; then
             echo "ENVIRONMENT=testing" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^testing\/[A-Za-z0-9]+$ ]]; then
+          elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^testing\/[A-Za-z0-9.]+$ ]]; then
             echo "ENVIRONMENT=testing" >> "$GITHUB_OUTPUT"
           elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^v?[0-9]{1,10}\.[0-9]{1,10}\.[0-9]{1,10}\-staging(\.[0-9]{1,10})?$ ]]; then
             echo "ENVIRONMENT=staging" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^staging\/[A-Za-z0-9]+$ ]]; then
+          elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^staging\/[A-Za-z0-9.]+$ ]]; then
             echo "ENVIRONMENT=staging" >> "$GITHUB_OUTPUT"
           elif [[ "${{ inputs.RELEASE_TAG }}" =~ ^v?[0-9]{1,10}\.[0-9]{1,10}\.[0-9]{1,10}$ ]]; then
             echo "ENVIRONMENT=production" >> "$GITHUB_OUTPUT"
