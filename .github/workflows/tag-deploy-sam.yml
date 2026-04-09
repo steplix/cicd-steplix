@@ -14,6 +14,11 @@ on:
       NODE_VERSION:
         type: string
         required: true
+      DOCKER_DEPLOY:
+        type: boolean
+        description: 'Enables Docker image deployment and requires ImageUri from pre_deploy.sh output'
+        required: false
+        default: false
       SLACK_CHANNEL:
         type: string
         description: 'Slack channel to send notifications'
@@ -41,6 +46,7 @@ permissions:
 env:
   SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
   NODE_VERSION: '${{ inputs.NODE_VERSION }}'
+  DOCKER_DEPLOY: '${{ inputs.DOCKER_DEPLOY }}'
 
   # Secrets
   SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
@@ -120,19 +126,43 @@ jobs:
         run: |
           if [ -f "pre_deploy.sh" ]; then
             echo "Pre deploying stacks..."
-            bash ./pre_deploy.sh --env ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+            PRE_DEPLOY_OUTPUT="$(bash ./pre_deploy.sh --env ${{ needs.infer-environment.outputs.ENVIRONMENT }})"
+            echo "${PRE_DEPLOY_OUTPUT}"
+
+            IMAGE_URI="$(printf '%s\n' "${PRE_DEPLOY_OUTPUT}" | sed -n 's/^IMAGE_URI=[[:space:]]*//p' | tail -n 1)"
+
+            if [ -n "${IMAGE_URI}" ]; then
+              echo "IMAGE_URI=${IMAGE_URI}" >> "$GITHUB_ENV"
+            elif [ "${DOCKER_DEPLOY}" = "true" ]; then
+              echo "pre_deploy.sh did not set IMAGE_URI"
+              exit 1
+            fi
           else
             echo "Skipping pre_deploy.sh script"
+            if [ "${DOCKER_DEPLOY}" = "true" ]; then
+              echo "docker_deploy=true requires pre_deploy.sh to set IMAGE_URI"
+              exit 1
+            fi
           fi
 
       - name: deploy
-        run: >-
-          sam deploy
-          --no-confirm-changeset
-          --no-fail-on-empty-changeset
-          --config-env ${{ needs.infer-environment.outputs.ENVIRONMENT }}
-      #          --parameter-overrides
-      #          Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }} ${{ vars.AWS_SAM_PARAMS_OVERRIDE }}
+        run: |
+          PARAMETER_OVERRIDES="Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }}"
+
+          if [ "${DOCKER_DEPLOY}" = "true" ]; then
+            if [ -z "${IMAGE_URI:-}" ]; then
+              echo "docker_deploy=true requires IMAGE_URI"
+              exit 1
+            fi
+            PARAMETER_OVERRIDES="${PARAMETER_OVERRIDES} ImageUri=${IMAGE_URI}"
+          fi
+
+          sam deploy \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --config-env ${{ needs.infer-environment.outputs.ENVIRONMENT }} \
+            --parameter-overrides \
+            ${PARAMETER_OVERRIDES}
 
       - name: Check and run post_deploy script
         run: |
