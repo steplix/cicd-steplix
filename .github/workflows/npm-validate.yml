@@ -32,13 +32,5 @@ jobs:
           cache: ${{ env.ENABLE_CACHE == 'true' && 'npm' || '' }}
       - name: Install dependencies
         run: npm ci --ignore-scripts
-      - name: Check and install database migrations dependencies
-        run: |
-          if [ -f "database/package.json" ]; then
-            echo "Installing migrations dependencies..."
-            cd database && npm ci --ignore-scripts
-          else
-            echo "Skipping migrations installation."
-          fi
       - name: Run tests
         run: npm run test --if-present
