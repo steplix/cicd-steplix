@@ -30,7 +30,7 @@ jobs:
           python3 <<'PY'
           import os
           import pathlib
-          import tomllib
+          import re
 
           environment = "${{ inputs.ENVIRONMENT }}"
           samconfig_path = pathlib.Path("${{ inputs.SAMCONFIG_PATH }}")
@@ -39,22 +39,54 @@ jobs:
           parameter_overrides = ""
 
           if samconfig_path.exists():
-              with samconfig_path.open("rb") as fh:
-                  data = tomllib.load(fh)
+              lines = samconfig_path.read_text(encoding="utf-8").splitlines()
+              target_section = f"[{environment}.deploy.parameters]"
+              in_target_section = False
+              in_parameter_overrides = False
+              values = []
 
-              section = (
-                  data.get(environment, {})
-                  .get("deploy", {})
-                  .get("parameters", {})
-              )
-              values = section.get("parameter_overrides", [])
+              for line in lines:
+                  stripped = line.strip()
 
-              if isinstance(values, list):
-                  parameter_overrides = " ".join(
-                      value.strip()
-                      for value in values
-                      if isinstance(value, str) and value.strip()
-                  )
+                  if not stripped or stripped.startswith("#"):
+                      continue
+
+                  if stripped.startswith("[") and stripped.endswith("]"):
+                      in_target_section = stripped == target_section
+                      in_parameter_overrides = False
+                      continue
+
+                  if not in_target_section:
+                      continue
+
+                  if not in_parameter_overrides:
+                      if not stripped.startswith("parameter_overrides"):
+                          continue
+
+                      _, _, remainder = stripped.partition("=")
+                      remainder = remainder.strip()
+
+                      if remainder.startswith("["):
+                          in_parameter_overrides = True
+                          remainder = remainder[1:].strip()
+                      elif remainder.startswith('"') and remainder.endswith('"'):
+                          values.extend(re.findall(r'"([^"]*)"', remainder))
+                          break
+                      else:
+                          continue
+                  else:
+                      remainder = stripped
+
+                  if "]" in remainder:
+                      remainder, _, _ = remainder.partition("]")
+                      in_parameter_overrides = False
+
+                  values.extend(re.findall(r'"([^"]*)"', remainder))
+
+                  if not in_parameter_overrides:
+                      break
+
+              parameter_overrides = " ".join(value.strip() for value in values if value.strip())
 
           with github_output.open("a", encoding="utf-8") as fh:
               fh.write(f"PARAMETER_OVERRIDES={parameter_overrides}\n")
