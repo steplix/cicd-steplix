@@ -1,0 +1,47 @@
+name: >
+  Get service version from package.json
+
+on:
+  workflow_call:
+    inputs:
+      PACKAGE_JSON_PATH:
+        required: false
+        type: string
+        default: package.json
+    outputs:
+      SERVICE_VERSION:
+        description: 'Service version read from package.json'
+        value: ${{ jobs.infer-service-version.outputs.SERVICE_VERSION }}
+
+jobs:
+  infer-service-version:
+    runs-on: ubuntu-22.04
+    outputs:
+      SERVICE_VERSION: ${{ steps.set-service-version.outputs.SERVICE_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read service version from package.json
+        id: set-service-version
+        run: |
+          PACKAGE_JSON_PATH="${{ inputs.PACKAGE_JSON_PATH }}"
+          SERVICE_VERSION=""
+
+          if [ ! -f "${PACKAGE_JSON_PATH}" ]; then
+            echo "package.json not found at ${PACKAGE_JSON_PATH}. Returning empty SERVICE_VERSION."
+            echo "SERVICE_VERSION=${SERVICE_VERSION}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SERVICE_VERSION="$(node -p "const pkg = require('./${PACKAGE_JSON_PATH}'); pkg.version || ''")"
+
+          if [ -z "${SERVICE_VERSION}" ] || [ "${SERVICE_VERSION}" = "undefined" ]; then
+            echo "version not found in ${PACKAGE_JSON_PATH}. Returning empty SERVICE_VERSION."
+            SERVICE_VERSION=""
+          fi
+
+          echo "SERVICE_VERSION=${SERVICE_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Log inferred service version '${{ steps.set-service-version.outputs.SERVICE_VERSION }}'
+        run: |
+          echo "Inferred Service Version: ${{ steps.set-service-version.outputs.SERVICE_VERSION }}"
