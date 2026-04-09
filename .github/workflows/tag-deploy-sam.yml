@@ -63,14 +63,14 @@ jobs:
     with:
       RELEASE_TAG: ${{ inputs.RELEASE_TAG }}
 
-  infer-service-version:
-    uses: steplix/cicd-steplix/.github/workflows/infer-service-version.yml@feature/LAB-144_pipelines
+  get-service-version:
+    uses: steplix/cicd-steplix/.github/workflows/get-service-version.yml@feature/LAB-144_pipelines
 
   get-deployment-id:
-    needs: infer-service-version
+    needs: get-service-version
     uses: steplix/cicd-steplix/.github/workflows/get-deployment-id.yml@feature/LAB-144_pipelines
     with:
-      SERVICE_VERSION: ${{ needs.infer-service-version.outputs.SERVICE_VERSION }}
+      SERVICE_VERSION: ${{ needs.get-service-version.outputs.SERVICE_VERSION }}
 
   validate-user-deploy:
     needs: infer-environment
@@ -81,7 +81,7 @@ jobs:
   build-deploy:
     needs:
       - infer-environment
-      - infer-service-version
+      - get-service-version
       - get-deployment-id
       - validate-user-deploy
     runs-on: ubuntu-22.04
@@ -158,7 +158,10 @@ jobs:
 
       - name: deploy
         run: |
-          PARAMETER_OVERRIDES="Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }} ServiceVersion=${{ needs.infer-service-version.outputs.SERVICE_VERSION }} DeploymentId=${{ needs.get-deployment-id.outputs.DEPLOYMENT_ID }}"
+          PARAMETER_OVERRIDES="\
+          Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }} \
+          ServiceVersion=${{ needs.get-service-version.outputs.SERVICE_VERSION }} \
+          DeploymentId=${{ needs.get-deployment-id.outputs.DEPLOYMENT_ID }}"
 
           if [ "${DOCKER_DEPLOY}" = "true" ]; then
             if [ -z "${IMAGE_URI:-}" ]; then

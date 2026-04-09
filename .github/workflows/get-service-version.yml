@@ -11,10 +11,10 @@ on:
     outputs:
       SERVICE_VERSION:
         description: 'Service version read from package.json'
-        value: ${{ jobs.infer-service-version.outputs.SERVICE_VERSION }}
+        value: ${{ jobs.get-service-version.outputs.SERVICE_VERSION }}
 
 jobs:
-  infer-service-version:
+  get-service-version:
     runs-on: ubuntu-22.04
     outputs:
       SERVICE_VERSION: ${{ steps.set-service-version.outputs.SERVICE_VERSION }}
