@@ -70,6 +70,12 @@ jobs:
     with:
       SERVICE_VERSION: ${{ needs.get-service-version.outputs.SERVICE_VERSION }}
 
+  get-parameter-overrides-by-env:
+    needs: infer-environment
+    uses: steplix/cicd-steplix/.github/workflows/get-parameter-overrides-by-env.yml@v2.0.0
+    with:
+      ENVIRONMENT: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+
   validate-user-deploy:
     needs: infer-environment
     uses: steplix/cicd-steplix/.github/workflows/validate-user-deploy.yml@v2.0.0
@@ -81,6 +87,7 @@ jobs:
       - infer-environment
       - get-service-version
       - get-deployment-id
+      - get-parameter-overrides-by-env
       - validate-user-deploy
     runs-on: ubuntu-22.04
     environment: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
@@ -150,7 +157,9 @@ jobs:
 
       - name: deploy
         run: |
-          PARAMETER_OVERRIDES="\
+          PARAMETER_OVERRIDES_FROM_ENV="${{ needs.get-parameter-overrides-by-env.outputs.PARAMETER_OVERRIDES }}"
+          # These values are controlled by the workflow and must override samconfig.toml.
+          PARAMETER_OVERRIDES_BASE="\
           Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }} \
           ServiceVersion=${{ needs.get-service-version.outputs.SERVICE_VERSION }} \
           DeploymentId=${{ needs.get-deployment-id.outputs.DEPLOYMENT_ID }}"
@@ -160,8 +169,30 @@ jobs:
               echo "docker_deploy=true requires IMAGE_URI"
               exit 1
             fi
-            PARAMETER_OVERRIDES="${PARAMETER_OVERRIDES} ImageUri=${IMAGE_URI}"
+            PARAMETER_OVERRIDES_BASE="${PARAMETER_OVERRIDES_BASE} ImageUri=${IMAGE_URI}"
           fi
+
+          # Merge samconfig overrides first, then replace duplicates with workflow-managed values.
+          PARAMETER_OVERRIDES="$(PARAMETER_OVERRIDES_FROM_ENV="${PARAMETER_OVERRIDES_FROM_ENV}" PARAMETER_OVERRIDES_BASE="${PARAMETER_OVERRIDES_BASE}" python3 <<'PY'
+          import os
+
+          env_overrides = os.environ["PARAMETER_OVERRIDES_FROM_ENV"].split()
+          base_overrides = os.environ["PARAMETER_OVERRIDES_BASE"].split()
+
+          merged = {}
+          order = []
+
+          for item in env_overrides + base_overrides:
+              if "=" not in item:
+                  continue
+              key, value = item.split("=", 1)
+              if key not in merged:
+                  order.append(key)
+              merged[key] = value
+
+          print(" ".join(f"{key}={merged[key]}" for key in order))
+          PY
+          )"
 
           sam deploy \
             --no-confirm-changeset \

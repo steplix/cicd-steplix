@@ -1,0 +1,65 @@
+name: >
+  Get parameter overrides by environment
+
+on:
+  workflow_call:
+    inputs:
+      ENVIRONMENT:
+        required: true
+        type: string
+      SAMCONFIG_PATH:
+        required: false
+        type: string
+        default: samconfig.toml
+    outputs:
+      PARAMETER_OVERRIDES:
+        description: 'parameter_overrides read from samconfig.toml for the selected environment'
+        value: ${{ jobs.get-parameter-overrides-by-env.outputs.PARAMETER_OVERRIDES }}
+
+jobs:
+  get-parameter-overrides-by-env:
+    runs-on: ubuntu-22.04
+    outputs:
+      PARAMETER_OVERRIDES: ${{ steps.set-parameter-overrides.outputs.PARAMETER_OVERRIDES }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read parameter_overrides from samconfig.toml
+        id: set-parameter-overrides
+        run: |
+          python3 <<'PY'
+          import os
+          import pathlib
+          import tomllib
+
+          environment = "${{ inputs.ENVIRONMENT }}"
+          samconfig_path = pathlib.Path("${{ inputs.SAMCONFIG_PATH }}")
+          github_output = pathlib.Path(os.environ["GITHUB_OUTPUT"])
+
+          parameter_overrides = ""
+
+          if samconfig_path.exists():
+              with samconfig_path.open("rb") as fh:
+                  data = tomllib.load(fh)
+
+              section = (
+                  data.get(environment, {})
+                  .get("deploy", {})
+                  .get("parameters", {})
+              )
+              values = section.get("parameter_overrides", [])
+
+              if isinstance(values, list):
+                  parameter_overrides = " ".join(
+                      value.strip()
+                      for value in values
+                      if isinstance(value, str) and value.strip()
+                  )
+
+          with github_output.open("a", encoding="utf-8") as fh:
+              fh.write(f"PARAMETER_OVERRIDES={parameter_overrides}\n")
+          PY
+
+      - name: Log parameter overrides
+        run: |
+          echo "Parameter overrides: '${{ steps.set-parameter-overrides.outputs.PARAMETER_OVERRIDES }}'"
