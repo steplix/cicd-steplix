@@ -66,6 +66,12 @@ jobs:
   infer-service-version:
     uses: steplix/cicd-steplix/.github/workflows/infer-service-version.yml@feature/LAB-144_pipelines
 
+  get-deployment-id:
+    needs: infer-service-version
+    uses: steplix/cicd-steplix/.github/workflows/get-deployment-id.yml@feature/LAB-144_pipelines
+    with:
+      SERVICE_VERSION: ${{ needs.infer-service-version.outputs.SERVICE_VERSION }}
+
   validate-user-deploy:
     needs: infer-environment
     uses: steplix/cicd-steplix/.github/workflows/validate-user-deploy.yml@feature/LAB-144_pipelines
@@ -76,6 +82,7 @@ jobs:
     needs:
       - infer-environment
       - infer-service-version
+      - get-deployment-id
       - validate-user-deploy
     runs-on: ubuntu-22.04
     environment: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
@@ -151,7 +158,7 @@ jobs:
 
       - name: deploy
         run: |
-          PARAMETER_OVERRIDES="Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }} ServiceVersion=${{ needs.infer-service-version.outputs.SERVICE_VERSION }}"
+          PARAMETER_OVERRIDES="Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }} ServiceVersion=${{ needs.infer-service-version.outputs.SERVICE_VERSION }} DeploymentId=${{ needs.get-deployment-id.outputs.DEPLOYMENT_ID }}"
 
           if [ "${DOCKER_DEPLOY}" = "true" ]; then
             if [ -z "${IMAGE_URI:-}" ]; then

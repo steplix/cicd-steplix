@@ -1,0 +1,38 @@
+name: >
+  Get deployment id
+
+on:
+  workflow_call:
+    inputs:
+      SERVICE_VERSION:
+        required: false
+        type: string
+        default: ''
+    outputs:
+      DEPLOYMENT_ID:
+        description: 'Deployment id built from service version, git short sha and UTC timestamp'
+        value: ${{ jobs.get-deployment-id.outputs.DEPLOYMENT_ID }}
+
+jobs:
+  get-deployment-id:
+    runs-on: ubuntu-22.04
+    outputs:
+      DEPLOYMENT_ID: ${{ steps.set-deployment-id.outputs.DEPLOYMENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build deployment id
+        id: set-deployment-id
+        run: |
+          SERVICE_VERSION="${{ inputs.SERVICE_VERSION }}"
+          GIT_SHORT_SHA="$(git rev-parse --short HEAD)"
+          DATE_UTC="$(date -u +%Y%m%d)"
+          TIME_UTC="$(date -u +%H%M)"
+
+          DEPLOYMENT_ID="${SERVICE_VERSION}r${GIT_SHORT_SHA}-${DATE_UTC}-b${TIME_UTC}"
+
+          echo "DEPLOYMENT_ID=${DEPLOYMENT_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Log deployment id '${{ steps.set-deployment-id.outputs.DEPLOYMENT_ID }}'
+        run: |
+          echo "Deployment ID: ${{ steps.set-deployment-id.outputs.DEPLOYMENT_ID }}"
