@@ -19,7 +19,7 @@ jobs:
     outputs:
       DEPLOYMENT_ID: ${{ steps.set-deployment-id.outputs.DEPLOYMENT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build deployment id
         id: set-deployment-id

@@ -19,7 +19,7 @@ jobs:
     outputs:
       SERVICE_VERSION: ${{ steps.set-service-version.outputs.SERVICE_VERSION }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Read service version from package.json
         id: set-service-version
