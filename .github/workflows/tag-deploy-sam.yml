@@ -23,21 +23,18 @@ on:
         type: string
         description: 'Slack channel to send notifications'
         required: false
+      AWS_ROLE_ARN_TESTING:
+        type: string
+        required: true
+      AWS_ROLE_ARN_STAGING:
+        type: string
+        required: false
+      AWS_ROLE_ARN_PRODUCTION:
+        type: string
+        required: false
     secrets:
       SLACK_WEBHOOK_URL:
         required: true
-      AWS_ROLE_ARN_TESTING:
-        required: true
-      AWS_REGION_TESTING:
-        required: true
-      AWS_ROLE_ARN_STAGING:
-        required: false
-      AWS_REGION_STAGING:
-        required: false
-      AWS_ROLE_ARN_PRODUCTION:
-        required: false
-      AWS_REGION_PRODUCTION:
-        required: false
 
 permissions:
   contents: read
@@ -48,14 +45,12 @@ env:
   NODE_VERSION: '${{ inputs.NODE_VERSION }}'
   DOCKER_DEPLOY: '${{ inputs.DOCKER_DEPLOY }}'
 
+  AWS_ROLE_ARN_TESTING: '${{ inputs.AWS_ROLE_ARN_TESTING }}'
+  AWS_ROLE_ARN_STAGING: '${{ inputs.AWS_ROLE_ARN_STAGING }}'
+  AWS_ROLE_ARN_PRODUCTION: '${{ inputs.AWS_ROLE_ARN_PRODUCTION }}'
+
   # Secrets
   SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
-  AWS_ROLE_ARN_TESTING: '${{ secrets.AWS_ROLE_ARN_TESTING }}'
-  AWS_REGION_TESTING: '${{ secrets.AWS_REGION_TESTING }}'
-  AWS_ROLE_ARN_STAGING: '${{ secrets.AWS_ROLE_ARN_STAGING }}'
-  AWS_REGION_STAGING: '${{ secrets.AWS_REGION_STAGING }}'
-  AWS_ROLE_ARN_PRODUCTION: '${{ secrets.AWS_ROLE_ARN_PRODUCTION }}'
-  AWS_REGION_PRODUCTION: '${{ secrets.AWS_REGION_PRODUCTION }}'
 
 jobs:
   infer-environment:
@@ -111,21 +106,21 @@ jobs:
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN_TESTING }}
           role-session-name: github-actions-testing-sam-deploy
-          aws-region: ${{ env.AWS_REGION_TESTING }}
+          aws-region: us-east-1
 
       - uses: aws-actions/configure-aws-credentials@v4
         if: needs.infer-environment.outputs.ENVIRONMENT == 'staging'
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN_STAGING }}
           role-session-name: github-actions-staging-sam-deploy
-          aws-region: ${{ env.AWS_REGION_STAGING }}
+          aws-region: us-east-1
 
       - uses: aws-actions/configure-aws-credentials@v4
         if: needs.infer-environment.outputs.ENVIRONMENT == 'production'
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN_PRODUCTION }}
           role-session-name: github-actions-production-sam-deploy
-          aws-region: ${{ env.AWS_REGION_PRODUCTION }}
+          aws-region: us-east-1
 
       - name: Check and run pre_deploy script
         run: |
