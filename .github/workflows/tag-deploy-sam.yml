@@ -25,12 +25,15 @@ on:
         required: false
       AWS_ROLE_ARN_TESTING:
         type: string
+        description: 'AWS IAM role ARN to assume via OIDC for testing deployments'
         required: true
       AWS_ROLE_ARN_STAGING:
         type: string
+        description: 'AWS IAM role ARN to assume via OIDC for staging deployments'
         required: false
       AWS_ROLE_ARN_PRODUCTION:
         type: string
+        description: 'AWS IAM role ARN to assume via OIDC for production deployments'
         required: false
     secrets:
       SLACK_WEBHOOK_URL:
