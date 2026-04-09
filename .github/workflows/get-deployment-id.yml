@@ -10,7 +10,7 @@ on:
         default: ''
     outputs:
       DEPLOYMENT_ID:
-        description: 'Deployment id built from service version, git short sha and UTC timestamp'
+        description: 'Deployment id built from: {service_version}+{git short sha}.{yyyMMdd}.{hhmm}'
         value: ${{ jobs.get-deployment-id.outputs.DEPLOYMENT_ID }}
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
           DATE_UTC="$(date -u +%Y%m%d)"
           TIME_UTC="$(date -u +%H%M)"
 
-          DEPLOYMENT_ID="${SERVICE_VERSION}r${GIT_SHORT_SHA}-${DATE_UTC}-b${TIME_UTC}"
+          DEPLOYMENT_ID="${SERVICE_VERSION}+${GIT_SHORT_SHA}.${DATE_UTC}.${TIME_UTC}"
 
           echo "DEPLOYMENT_ID=${DEPLOYMENT_ID}" >> "$GITHUB_OUTPUT"
 
