@@ -57,22 +57,22 @@ env:
 
 jobs:
   infer-environment:
-    uses: steplix/cicd-steplix/.github/workflows/infer-environment.yml@feature/LAB-144_pipelines
+    uses: steplix/cicd-steplix/.github/workflows/infer-environment.yml@v2.0.0
     with:
       RELEASE_TAG: ${{ inputs.RELEASE_TAG }}
 
   get-service-version:
-    uses: steplix/cicd-steplix/.github/workflows/get-service-version.yml@feature/LAB-144_pipelines
+    uses: steplix/cicd-steplix/.github/workflows/get-service-version.yml@v2.0.0
 
   get-deployment-id:
     needs: get-service-version
-    uses: steplix/cicd-steplix/.github/workflows/get-deployment-id.yml@feature/LAB-144_pipelines
+    uses: steplix/cicd-steplix/.github/workflows/get-deployment-id.yml@v2.0.0
     with:
       SERVICE_VERSION: ${{ needs.get-service-version.outputs.SERVICE_VERSION }}
 
   validate-user-deploy:
     needs: infer-environment
-    uses: steplix/cicd-steplix/.github/workflows/validate-user-deploy.yml@feature/LAB-144_pipelines
+    uses: steplix/cicd-steplix/.github/workflows/validate-user-deploy.yml@v2.0.0
     with:
       ENVIRONMENT: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
 
