@@ -39,7 +39,7 @@ jobs:
     name: Create PR
     steps:
       - name: Check out the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Create Pull Request from '${{env.ORIGIN_BRANCH}}' to '${{env.DEST_BRANCH}}'
         id: pr

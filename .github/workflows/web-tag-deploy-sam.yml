@@ -78,13 +78,13 @@ env:
 
 jobs:
   infer-environment:
-    uses: steplix/cicd-steplix/.github/workflows/infer-environment.yml@main
+    uses: steplix/cicd-steplix/.github/workflows/infer-environment.yml@v1.0.0
     with:
       RELEASE_TAG: ${{ inputs.RELEASE_TAG }}
 
   validate-user-deploy:
     needs: infer-environment
-    uses: steplix/cicd-steplix/.github/workflows/validate-user-deploy.yml@main
+    uses: steplix/cicd-steplix/.github/workflows/validate-user-deploy.yml@v1.0.0
     with:
       ENVIRONMENT: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
 

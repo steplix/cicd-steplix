@@ -1,0 +1,241 @@
+name: >
+  AWS SAM deployment by Tag. 
+  Gets the RELEASE TAG and deploys the changes to the corresponding environment:
+  - 'v1.0.1-testing' | 'testing/xxx'   -> deploy to Testing  
+  - 'v1.0.1-staging' | 'staging/xxx'   -> deploy to Staging
+  - 'v1.0.1'                           -> deploy to Production  
+
+on:
+  workflow_call:
+    inputs:
+      RELEASE_TAG:
+        type: string
+        required: true
+      NODE_VERSION:
+        type: string
+        required: true
+      AWS_STACK_NAME:
+        type: string
+        description: 'AWS CloudFormation stack name used by post_deploy.sh'
+        required: true
+      DOCKER_DEPLOY:
+        type: boolean
+        description: 'Enables Docker image deployment and requires ImageUri from pre_deploy.sh output'
+        required: false
+        default: false
+      SLACK_CHANNEL:
+        type: string
+        description: 'Slack channel to send notifications'
+        required: false
+      AWS_ROLE_ARN_TESTING:
+        type: string
+        description: 'AWS IAM role ARN to assume via OIDC for testing deployments'
+        required: true
+      AWS_ROLE_ARN_STAGING:
+        type: string
+        description: 'AWS IAM role ARN to assume via OIDC for staging deployments'
+        required: false
+      AWS_ROLE_ARN_PRODUCTION:
+        type: string
+        description: 'AWS IAM role ARN to assume via OIDC for production deployments'
+        required: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
+  NODE_VERSION: '${{ inputs.NODE_VERSION }}'
+  AWS_STACK_NAME: '${{ inputs.AWS_STACK_NAME }}'
+  DOCKER_DEPLOY: '${{ inputs.DOCKER_DEPLOY }}'
+
+  AWS_ROLE_ARN_TESTING: '${{ inputs.AWS_ROLE_ARN_TESTING }}'
+  AWS_ROLE_ARN_STAGING: '${{ inputs.AWS_ROLE_ARN_STAGING }}'
+  AWS_ROLE_ARN_PRODUCTION: '${{ inputs.AWS_ROLE_ARN_PRODUCTION }}'
+
+  # Secrets
+  SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
+
+jobs:
+  infer-environment:
+    uses: steplix/cicd-steplix/.github/workflows/infer-environment.yml@v2.0.0
+    with:
+      RELEASE_TAG: ${{ inputs.RELEASE_TAG }}
+
+  get-service-version:
+    uses: steplix/cicd-steplix/.github/workflows/get-service-version.yml@v2.0.0
+
+  get-deployment-id:
+    needs: get-service-version
+    uses: steplix/cicd-steplix/.github/workflows/get-deployment-id.yml@v2.0.0
+    with:
+      SERVICE_VERSION: ${{ needs.get-service-version.outputs.SERVICE_VERSION }}
+
+  get-parameter-overrides-by-env:
+    needs: infer-environment
+    uses: steplix/cicd-steplix/.github/workflows/get-parameter-overrides-by-env.yml@v2.0.0
+    with:
+      ENVIRONMENT: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+
+  validate-user-deploy:
+    needs: infer-environment
+    uses: steplix/cicd-steplix/.github/workflows/validate-user-deploy.yml@v2.0.0
+    with:
+      ENVIRONMENT: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+
+  build-deploy:
+    needs:
+      - infer-environment
+      - get-service-version
+      - get-deployment-id
+      - get-parameter-overrides-by-env
+      - validate-user-deploy
+    runs-on: ubuntu-22.04
+    environment: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+    steps:
+      - name: Print inferred environment '${{ needs.infer-environment.outputs.ENVIRONMENT }}'
+        run: |
+          echo "Inferred Environment: '${{ needs.infer-environment.outputs.ENVIRONMENT }}'"
+      # BUILD
+      - uses: actions/checkout@v5
+      - uses: aws-actions/setup-sam@v2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: build TS
+        run: npm run build
+      - name: Creating release '${{ inputs.RELEASE_TAG }}' for '${{ needs.infer-environment.outputs.ENVIRONMENT }}'
+        run: sam build --config-env ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+
+      # DEPLOY
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: needs.infer-environment.outputs.ENVIRONMENT =='testing'
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN_TESTING }}
+          role-session-name: github-actions-testing-sam-deploy
+          aws-region: us-east-1
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: needs.infer-environment.outputs.ENVIRONMENT == 'staging'
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN_STAGING }}
+          role-session-name: github-actions-staging-sam-deploy
+          aws-region: us-east-1
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: needs.infer-environment.outputs.ENVIRONMENT == 'production'
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN_PRODUCTION }}
+          role-session-name: github-actions-production-sam-deploy
+          aws-region: us-east-1
+
+      - name: Check and run pre_deploy script
+        run: |
+          if [ -f "pre_deploy.sh" ]; then
+            echo "Pre deploying stacks..."
+            PRE_DEPLOY_OUTPUT="$(bash ./pre_deploy.sh --env ${{ needs.infer-environment.outputs.ENVIRONMENT }})"
+            echo "${PRE_DEPLOY_OUTPUT}"
+
+            IMAGE_URI="$(printf '%s\n' "${PRE_DEPLOY_OUTPUT}" | sed -n 's/^IMAGE_URI=[[:space:]]*//p' | tail -n 1)"
+
+            if [ -n "${IMAGE_URI}" ]; then
+              echo "IMAGE_URI=${IMAGE_URI}" >> "$GITHUB_ENV"
+            elif [ "${DOCKER_DEPLOY}" = "true" ]; then
+              echo "pre_deploy.sh did not set IMAGE_URI"
+              exit 1
+            fi
+          else
+            echo "Skipping pre_deploy.sh script"
+            if [ "${DOCKER_DEPLOY}" = "true" ]; then
+              echo "docker_deploy=true requires pre_deploy.sh to set IMAGE_URI"
+              exit 1
+            fi
+          fi
+
+      - name: deploy
+        run: |
+          PARAMETER_OVERRIDES_FROM_ENV="${{ needs.get-parameter-overrides-by-env.outputs.PARAMETER_OVERRIDES }}"
+          # These values are controlled by the workflow and must override samconfig.toml.
+          PARAMETER_OVERRIDES_BASE="\
+          Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }} \
+          ServiceVersion=${{ needs.get-service-version.outputs.SERVICE_VERSION }} \
+          DeploymentId=${{ needs.get-deployment-id.outputs.DEPLOYMENT_ID }}"
+
+          if [ "${DOCKER_DEPLOY}" = "true" ]; then
+            if [ -z "${IMAGE_URI:-}" ]; then
+              echo "docker_deploy=true requires IMAGE_URI"
+              exit 1
+            fi
+            PARAMETER_OVERRIDES_BASE="${PARAMETER_OVERRIDES_BASE} ImageUri=${IMAGE_URI}"
+          fi
+
+          # Merge samconfig overrides first, then replace duplicates with workflow-managed values.
+          PARAMETER_OVERRIDES="$(PARAMETER_OVERRIDES_FROM_ENV="${PARAMETER_OVERRIDES_FROM_ENV}" PARAMETER_OVERRIDES_BASE="${PARAMETER_OVERRIDES_BASE}" python3 <<'PY'
+          import os
+
+          env_overrides = os.environ["PARAMETER_OVERRIDES_FROM_ENV"].split()
+          base_overrides = os.environ["PARAMETER_OVERRIDES_BASE"].split()
+
+          merged = {}
+          order = []
+
+          for item in env_overrides + base_overrides:
+              if "=" not in item:
+                  continue
+              key, value = item.split("=", 1)
+              if key not in merged:
+                  order.append(key)
+              merged[key] = value
+
+          print(" ".join(f"{key}={merged[key]}" for key in order))
+          PY
+          )"
+
+          sam deploy \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --config-env ${{ needs.infer-environment.outputs.ENVIRONMENT }} \
+            --parameter-overrides \
+            ${PARAMETER_OVERRIDES}
+
+      - name: Check and run post_deploy script
+        run: |
+          if [ -f "post_deploy.sh" ]; then
+            echo "Post deploying stacks..."
+            bash ./post_deploy.sh --env ${{ needs.infer-environment.outputs.ENVIRONMENT }} --stack-name ${{ env.AWS_STACK_NAME }}
+          else
+            echo "Skipping post_deploy.sh script"
+          fi
+
+      - name: Notify Slack of new available release
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: release
+          status: ${{ job.status }}
+          channel: ${{ env.SLACK_CHANNEL }}
+          icon_url: ${{ vars.SLACK_LOGO_URL }}
+        env:
+          NEW_TAG: ${{ inputs.RELEASE_TAG }}
+
+  notify-failure:
+    runs-on: ubuntu-22.04
+    needs:
+      - build-deploy
+    if: failure()
+    continue-on-error: true
+    steps:
+      - name: Slack Notify
+        uses: steplix/cicd-notify@1.0.0
+        continue-on-error: true
+        with:
+          template: push
+          status: failure
+          icon_url: ${{ vars.SLACK_LOGO_URL }}
