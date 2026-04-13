@@ -14,6 +14,10 @@ on:
       NODE_VERSION:
         type: string
         required: true
+      AWS_STACK_NAME:
+        type: string
+        description: 'AWS CloudFormation stack name used by post_deploy.sh'
+        required: true
       DOCKER_DEPLOY:
         type: boolean
         description: 'Enables Docker image deployment and requires ImageUri from pre_deploy.sh output'
@@ -46,6 +50,7 @@ permissions:
 env:
   SLACK_CHANNEL: '${{ inputs.SLACK_CHANNEL }}'
   NODE_VERSION: '${{ inputs.NODE_VERSION }}'
+  AWS_STACK_NAME: '${{ inputs.AWS_STACK_NAME }}'
   DOCKER_DEPLOY: '${{ inputs.DOCKER_DEPLOY }}'
 
   AWS_ROLE_ARN_TESTING: '${{ inputs.AWS_ROLE_ARN_TESTING }}'
@@ -205,7 +210,7 @@ jobs:
         run: |
           if [ -f "post_deploy.sh" ]; then
             echo "Post deploying stacks..."
-            bash ./post_deploy.sh --env ${{ needs.infer-environment.outputs.ENVIRONMENT }} --stack-name ${{ vars.AWS_STACK_NAME }}
+            bash ./post_deploy.sh --env ${{ needs.infer-environment.outputs.ENVIRONMENT }} --stack-name ${{ env.AWS_STACK_NAME }}
           else
             echo "Skipping post_deploy.sh script"
           fi
