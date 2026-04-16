@@ -1,0 +1,33 @@
+name: 1. Deployment by Tag
+# Gets the RELEASE TAG and deploys the changes to the corresponding environment:
+#- 'v1.0.1-testing' | 'testing/xxx'   -> deploy to Testing
+#- 'v1.0.1-staging' | 'staging/xxx'   -> deploy to Staging
+#- 'v1.0.1'                           -> deploy to Production
+
+run-name: >
+  Deploy: ${{ github.event.release.tag_name }}
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  deploy:
+    uses: steplix/cicd-steplix/.github/workflows/tag-deploy-sam.yml@v2.0.0
+    with:
+      # LTS Version
+      NODE_VERSION: '24.14.1'
+      AWS_STACK_NAME: 'steplix-price-api'
+      DOCKER_DEPLOY: true
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+      # Testing
+      AWS_ROLE_ARN_TESTING: '${{ vars.AWS_ROLE_ARN_TESTING }}'
+      # Staging
+      AWS_ROLE_ARN_STAGING: '${{ vars.AWS_ROLE_ARN_STAGING }}'
+      # Production
+      AWS_ROLE_ARN_PRODUCTION: '${{ vars.AWS_ROLE_ARN_PRODUCTION }}'
+      DEPENDENCY_PATH: './src'
+    secrets:
+      SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
