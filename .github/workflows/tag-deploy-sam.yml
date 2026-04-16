@@ -27,6 +27,11 @@ on:
         type: string
         description: 'Slack channel to send notifications'
         required: false
+      ENV_FILE_NAME:
+        type: string
+        description: 'Environment file name to create when ENV_VARIABLES_* is provided'
+        required: false
+        default: '.env'
       AWS_ROLE_ARN_TESTING:
         type: string
         description: 'AWS IAM role ARN to assume via OIDC for testing deployments'
@@ -42,6 +47,15 @@ on:
     secrets:
       SLACK_WEBHOOK_URL:
         required: true
+      ENV_VARIABLES_TESTING:
+        description: 'Environment file content for testing deployments'
+        required: false
+      ENV_VARIABLES_STAGING:
+        description: 'Environment file content for staging deployments'
+        required: false
+      ENV_VARIABLES_PRODUCTION:
+        description: 'Environment file content for production deployments'
+        required: false
 
 permissions:
   contents: read
@@ -107,6 +121,21 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+      - name: Create .env file
+        shell: bash
+        env:
+          ENVIRONMENT: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+          ENV_FILE_NAME: ${{ inputs.ENV_FILE_NAME }}
+          ENV_VARIABLES: ${{ needs.infer-environment.outputs.ENVIRONMENT == 'testing' && secrets.ENV_VARIABLES_TESTING || needs.infer-environment.outputs.ENVIRONMENT == 'staging' && secrets.ENV_VARIABLES_STAGING || needs.infer-environment.outputs.ENVIRONMENT == 'production' && secrets.ENV_VARIABLES_PRODUCTION || '' }}
+        run: |
+          ENV_VARIABLES_NAME="ENV_VARIABLES_${ENVIRONMENT^^}"
+
+          if [ -z "${ENV_VARIABLES}" ]; then
+            echo "${ENV_VARIABLES_NAME} is not defined. Skipping ${ENV_FILE_NAME} creation."
+            exit 0
+          fi
+
+          printf '%s\n' "${ENV_VARIABLES}" > "${ENV_FILE_NAME}"
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
