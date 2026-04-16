@@ -23,6 +23,7 @@ on:
 env:
   NODE_VERSION: '${{ inputs.NODE_VERSION }}'
   ENABLE_CACHE: '${{ inputs.ENABLE_CACHE }}'
+  CACHE_DEPENDENCY_PATH: '${{ inputs.CACHE_DEPENDENCY_PATH }}'
 
 jobs:
   run-tests:
