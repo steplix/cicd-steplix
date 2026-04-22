@@ -1,0 +1,118 @@
+name: >
+  Get tags by environment
+
+on:
+  workflow_call:
+    inputs:
+      ENVIRONMENT:
+        required: true
+        type: string
+      SERVICE_VERSION:
+        required: true
+        type: string
+      DEPLOYMENT_ID:
+        required: true
+        type: string
+      SAMCONFIG_PATH:
+        required: false
+        type: string
+        default: samconfig.toml
+    outputs:
+      TAGS:
+        description: 'tags read from samconfig.toml for the selected environment, extended with workflow-managed tags'
+        value: ${{ jobs.get-tags-by-env.outputs.TAGS }}
+
+jobs:
+  get-tags-by-env:
+    runs-on: ubuntu-22.04
+    outputs:
+      TAGS: ${{ steps.set-tags.outputs.TAGS }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read tags from samconfig.toml
+        id: set-tags
+        run: |
+          python3 <<'PY'
+          import os
+          import pathlib
+          import re
+
+          environment = "${{ inputs.ENVIRONMENT }}"
+          service_version = "${{ inputs.SERVICE_VERSION }}"
+          deployment_id = "${{ inputs.DEPLOYMENT_ID }}"
+          samconfig_path = pathlib.Path("${{ inputs.SAMCONFIG_PATH }}")
+          github_output = pathlib.Path(os.environ["GITHUB_OUTPUT"])
+
+          tags = {}
+
+          def append_values(values):
+              for item in values:
+                  item = item.strip()
+                  if not item or "=" not in item:
+                      continue
+                  key, value = item.split("=", 1)
+                  tags[key] = value
+
+          if samconfig_path.exists():
+              lines = samconfig_path.read_text(encoding="utf-8").splitlines()
+              target_section = f"[{environment}.deploy.parameters]"
+              in_target_section = False
+              in_tags = False
+              values = []
+
+              for line in lines:
+                  stripped = line.strip()
+
+                  if not stripped or stripped.startswith("#"):
+                      continue
+
+                  if stripped.startswith("[") and stripped.endswith("]"):
+                      in_target_section = stripped == target_section
+                      in_tags = False
+                      continue
+
+                  if not in_target_section:
+                      continue
+
+                  if not in_tags:
+                      if not stripped.startswith("tags"):
+                          continue
+
+                      _, _, remainder = stripped.partition("=")
+                      remainder = remainder.strip()
+
+                      if remainder.startswith("["):
+                          in_tags = True
+                          remainder = remainder[1:].strip()
+                      elif remainder.startswith('"') and remainder.endswith('"'):
+                          values.extend(re.findall(r'"([^"]*)"', remainder))
+                          break
+                      else:
+                          continue
+                  else:
+                      remainder = stripped
+
+                  if "]" in remainder:
+                      remainder, _, _ = remainder.partition("]")
+                      in_tags = False
+
+                  values.extend(re.findall(r'"([^"]*)"', remainder))
+
+                  if not in_tags:
+                      break
+
+              append_values(values)
+
+          tags["ServiceVersion"] = service_version
+          tags["DeploymentId"] = deployment_id
+
+          merged_tags = " ".join(f"{key}={value}" for key, value in tags.items())
+
+          with github_output.open("a", encoding="utf-8") as fh:
+              fh.write(f"TAGS={merged_tags}\n")
+          PY
+
+      - name: Log tags
+        run: |
+          echo "Tags: '${{ steps.set-tags.outputs.TAGS }}'"
