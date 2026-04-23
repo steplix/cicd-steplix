@@ -7,7 +7,7 @@ on:
       PACKAGE_JSON_PATH:
         required: false
         type: string
-        default: package.json
+        default: '.'
     outputs:
       SERVICE_VERSION:
         description: 'Service version read from package.json'
@@ -24,7 +24,7 @@ jobs:
       - name: Read service version from package.json
         id: set-service-version
         run: |
-          PACKAGE_JSON_PATH="${{ inputs.PACKAGE_JSON_PATH }}"
+          PACKAGE_JSON_PATH="${{ inputs.PACKAGE_JSON_PATH }}/package.json"
           SERVICE_VERSION=""
 
           if [ ! -f "${PACKAGE_JSON_PATH}" ]; then

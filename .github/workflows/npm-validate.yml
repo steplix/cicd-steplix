@@ -14,10 +14,16 @@ on:
         default: 'true'
         description: Enable package.json cache
         required: false
+      CACHE_DEPENDENCY_PATH:
+        type: string
+        default: '.'
+        description: Path package-lock.json cache
+        required: false
 
 env:
   NODE_VERSION: '${{ inputs.NODE_VERSION }}'
   ENABLE_CACHE: '${{ inputs.ENABLE_CACHE }}'
+  CACHE_DEPENDENCY_PATH: '${{ inputs.CACHE_DEPENDENCY_PATH }}'
 
 jobs:
   run-tests:
@@ -30,7 +36,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: ${{ env.ENABLE_CACHE == 'true' && 'npm' || '' }}
+          cache-dependency-path: ${{ env.CACHE_DEPENDENCY_PATH }}/package-lock.json
       - name: Install dependencies
         run: npm ci --ignore-scripts
+        working-directory: ${{ env.CACHE_DEPENDENCY_PATH }}
       - name: Run tests
         run: npm run test --if-present
+        working-directory: ${{ env.CACHE_DEPENDENCY_PATH }}

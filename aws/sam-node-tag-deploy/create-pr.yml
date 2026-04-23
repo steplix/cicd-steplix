@@ -1,0 +1,42 @@
+name: 1. Auto Create Pull Requests
+
+on:
+  push:
+    branches:
+      - develop
+      - testing
+      - staging
+
+jobs:
+  create-pr-develop-to-testing:
+    if: github.ref == 'refs/heads/develop'
+    uses: steplix/cicd-steplix/.github/workflows/create-pr.yml@v2.0.0
+    with:
+      COMMIT_MESSAGE: '${{ github.event.head_commit.message }}'
+      ORIGIN_BRANCH: 'develop'
+      DEST_BRANCH: 'testing'
+      SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+    secrets:
+      SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
+
+  create-pr-testing-to-staging:
+    if: github.ref == 'refs/heads/testing'
+    uses: steplix/cicd-steplix/.github/workflows/create-pr.yml@v2.0.0
+    with:
+      COMMIT_MESSAGE: '${{ github.event.head_commit.message }}'
+      ORIGIN_BRANCH: 'testing'
+      DEST_BRANCH: 'staging'
+      SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+    secrets:
+      SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'
+
+  create-pr-staging-to-master:
+    if: github.ref == 'refs/heads/staging'
+    uses: steplix/cicd-steplix/.github/workflows/create-pr.yml@v2.0.0
+    with:
+      COMMIT_MESSAGE: '${{ github.event.head_commit.message }}'
+      ORIGIN_BRANCH: 'staging'
+      DEST_BRANCH: 'master'
+      SLACK_CHANNEL: '${{ vars.SLACK_CHANNEL }}'
+    secrets:
+      SLACK_WEBHOOK_URL: '${{ secrets.SLACK_WEBHOOK_URL }}'

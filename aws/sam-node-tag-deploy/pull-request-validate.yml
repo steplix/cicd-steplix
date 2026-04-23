@@ -1,0 +1,27 @@
+name: 0. Pull Request Validation
+
+run-name: >
+  PR validate
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - develop
+      - testing
+      - staging
+      - master
+
+jobs:
+  run-tests:
+    if: github.event.pull_request.draft == false
+    uses: steplix/cicd-steplix/.github/workflows/npm-validate.yml@v2.0.0
+    with:
+      # LTS Version
+      NODE_VERSION: '24.14.1'
+      ENABLE_CACHE: 'true'
+      CACHE_DEPENDENCY_PATH: './src'
