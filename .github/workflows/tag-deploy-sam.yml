@@ -95,6 +95,17 @@ jobs:
     with:
       ENVIRONMENT: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
 
+  get-tags-by-env:
+    needs:
+      - infer-environment
+      - get-service-version
+      - get-deployment-id
+    uses: ./.github/workflows/get-tags-by-env.yml
+    with:
+      ENVIRONMENT: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
+      SERVICE_VERSION: ${{ needs.get-service-version.outputs.SERVICE_VERSION }}
+      DEPLOYMENT_ID: ${{ needs.get-deployment-id.outputs.DEPLOYMENT_ID }}
+
   validate-user-deploy:
     needs: infer-environment
     uses: steplix/cicd-steplix/.github/workflows/validate-user-deploy.yml@v2.0.0
@@ -107,6 +118,7 @@ jobs:
       - get-service-version
       - get-deployment-id
       - get-parameter-overrides-by-env
+      - get-tags-by-env
       - validate-user-deploy
     runs-on: ubuntu-22.04
     environment: ${{ needs.infer-environment.outputs.ENVIRONMENT }}
@@ -232,6 +244,8 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --config-env ${{ needs.infer-environment.outputs.ENVIRONMENT }} \
+            --tags \
+            ${{ needs.get-tags-by-env.outputs.TAGS }} \
             --parameter-overrides \
             ${PARAMETER_OVERRIDES}
 
