@@ -52,6 +52,8 @@ jobs:
                   if not item or "=" not in item:
                       continue
                   key, value = item.split("=", 1)
+                  if value == "":
+                      continue
                   tags[key] = value
 
           if samconfig_path.exists():
@@ -104,7 +106,7 @@ jobs:
 
               append_values(values)
 
-          tags["ServiceVersion"] = service_version
+          tags["ServiceVersion"] = service_version or "-"
           tags["DeploymentId"] = deployment_id
 
           merged_tags = " ".join(f"{key}={value}" for key, value in tags.items())
