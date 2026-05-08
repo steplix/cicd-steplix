@@ -210,7 +210,7 @@ jobs:
           # These values are controlled by the workflow and must override samconfig.toml.
           PARAMETER_OVERRIDES_BASE="\
           Environment=${{ needs.infer-environment.outputs.ENVIRONMENT }} \
-          ServiceVersion=${{ needs.get-service-version.outputs.SERVICE_VERSION }} \
+          ServiceVersion=${{ needs.get-service-version.outputs.SERVICE_VERSION || '-' }} \
           DeploymentId=${{ needs.get-deployment-id.outputs.DEPLOYMENT_ID }}"
 
           if [ "${DOCKER_DEPLOY}" = "true" ]; then
