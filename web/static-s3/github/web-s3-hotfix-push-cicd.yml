@@ -1,0 +1,19 @@
+name: Push Hotfix in master branch
+run-name: >
+  Push: ${{ github.ref_name }}
+
+on:
+  push:
+    branches:
+      - 'hotfix/**'
+
+jobs:
+  hotfix:
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-hotfix-push.yml@feature/addStaticWebWorkflows
+    with:
+      NODE_VERSION: ${{ vars.NODE_VERSION }}
+      DESTINATION_PR_MASTER: ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}
+      DESTINATION_PR_DEVELOP: develop
+      SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

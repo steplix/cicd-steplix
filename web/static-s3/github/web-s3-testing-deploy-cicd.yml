@@ -1,0 +1,24 @@
+name: Push in testing branch
+run-name: >
+  "Deploying testing and creating PR to ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}"
+on:
+  push:
+    branches:
+      - testing
+
+
+jobs:
+
+  testing:
+    uses: steplix/cicd-steplix/.github/workflows/web-s3-testing-deploy.yml@feature/addStaticWebWorkflows
+    with:
+      NODE_VERSION: ${{ vars.NODE_VERSION }}
+      DESTINATION_PR: ${{ vars.DESTINATION_PR_ON_TESTING_WORKFLOW }}
+      SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
+      AWS_BUCKET: ${{ vars.TEST_AWS_BUCKET }}
+      AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.TEST_AWS_CLOUDFRONT_DISTRIBUTION_ID }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      AWS_KEY_ID: ${{ secrets.TEST_AWS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.TEST_AWS_REGION }}

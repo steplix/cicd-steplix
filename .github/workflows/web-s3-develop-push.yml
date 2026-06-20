@@ -1,0 +1,92 @@
+name: Push in development branch
+run-name: >
+  "Create PR FROM develop TO ${{ inputs.DESTINATION_PR }}: ${{ github.event.head_commit.message }}"
+
+on:
+  workflow_call:
+    inputs:
+      NODE_VERSION:
+        description: 'Node version to use'
+        type: string
+        default: 14.18.0
+        required: false
+      DESTINATION_PR:
+        description: 'Branch to target MR'
+        type: string
+        default: testing
+        required: false
+      PR_TITLE:
+        type: string
+        description: "Title for the pr"
+        default: "Pushing develop"
+        required: false
+      SLACK_CHANNEL:
+        type: string
+        description: Slack channel to send notifications
+        required: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+
+  testing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run test --if-present
+      - run: echo "TEST SUCCESSFULLY"
+
+  build:
+    needs: [ testing ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run release
+
+
+  generate-pr:
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: generate-pr
+        id: open-pr
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: ${{ inputs.DESTINATION_PR }}
+          pr_title: ${{ inputs.PR_TITLE }}
+      - run: echo "PR GENERATED SUCCESSFULLY"
+      - name: Notify Slack
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: pr
+          status: ${{ job.status }}
+          channel: ${{ inputs.SLACK_CHANNEL }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          PR_URL: ${{ steps.open-pr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.open-pr.outputs.pr_number }}
+
+
+  notify-failure:
+    if: failure()
+    needs: [ testing, build, generate-pr ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: 'push'
+          status: failure
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          channel: ${{ inputs.SLACK_CHANNEL }}
