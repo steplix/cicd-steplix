@@ -1,0 +1,95 @@
+name: Deploy lambda SAM
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      pr-branch:
+        type: string
+        description: Branch name to generate a new pull request when all workflow is success, the PR isn't generate if don't pass this arg.
+        required: false
+    secrets:
+      variables:
+        required: false
+      slack-webhook:
+        required: true
+      aws-access-key-id:
+        required: true
+      aws-secret-access-key:
+        required: true
+      aws-region:
+        required: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@v3
+
+    - name: Setup Node ${{ env.NODE_VERSION }} Environment
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: 'Resolve Project Dependencies Using Npm'
+      shell: bash
+      run: |
+        pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+        npm install
+        npm run build --if-present
+        npm run test --if-present
+        popd
+
+    - name: 'Run Azure Functions Action'
+      uses: Azure/functions-action@v1
+      id: fa
+      with:
+        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+        package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+
+  generate-pr:
+    needs: build-deploy
+    if: ${{ inputs.pr-branch != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: create-pr
+        id: pr
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: ${{ inputs.pr-branch }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Slack Notify
+        if: success()
+        continue-on-error: true
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: pr
+          status: ${{ job.status }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.slack-webhook }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+
+  slack-notify:
+    runs-on: ubuntu-latest
+    needs:
+      - check-aws-credentials
+      - build-deploy
+      - generate-pr
+    if: failure()
+    continue-on-error: true
+    steps:
+      - name: Slack Notify
+        uses: steplix/cicd-notify@1.0.0
+        with:
+          template: push
+          status: ${{ job.status }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.slack-webhook }}
